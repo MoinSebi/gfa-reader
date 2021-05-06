@@ -19,13 +19,14 @@ pub fn counter(start: i32, end: i32){
 pub struct Node{
     pub id: String,
     pub len: usize,
+    pub seq: String,
 }
 
 #[derive(Debug)]
 pub struct Edge{
-    pub from: u32,
+    pub from: String,
     pub from_dir: bool,
-    pub to: u32,
+    pub to: String,
     pub to_dir: bool,
 }
 
@@ -46,7 +47,8 @@ pub struct Gfa{
 pub fn readGFA(a: &str) -> Gfa {
 
     // This is the reader structure
-    let file_name= "/home/svorbrugg_local/Rust/data/AAA_AAB.cat.gfa";
+    // "/home/svorbrugg_local/Rust/data/AAA_AAB.cat.gfa";
+    let file_name= a;
     let file = File::open(file_name).expect("ERROR: CAN NOT READ FILE\n");
     let reader = BufReader::new(file);
 
@@ -64,17 +66,17 @@ pub fn readGFA(a: &str) -> Gfa {
         let l = line.unwrap();
         let lsplit: Vec<&str> = l.split("\t").collect();
         if l.starts_with("S") {
-            ns.insert(String::from(lsplit[1]), Node { id: String::from(lsplit[2]), len: lsplit[2].len() });
+            ns.insert(String::from(lsplit[1]), Node { id: String::from(lsplit[1]), seq: String::from(lsplit[2]), len: lsplit[2].len() });
 
         }
         else if l.starts_with("P"){
             let name: String = String::from(lsplit[1]);
-            let dirs: Vec<bool> = lsplit[2].split(",").map(|d| if lsplit[2] == "+" { !false } else { !true }).collect();
+            let dirs: Vec<bool> = lsplit[2].split(",").map(|d| if &d[d.len()-1..] == "+" { !false } else { !true }).collect();
             let nodd: Vec<String> = lsplit[2].split(",").map(|d| d[..d.len()-1].parse().unwrap()).collect();
             ps.push(Path {name: name, dir: dirs, nodes: nodd});
         }
         else if l.starts_with("L") {
-            es.push(Edge{from: lsplit[1].parse().unwrap() , to: lsplit[1].parse().unwrap() , from_dir: if lsplit[2] == "+" { !false } else { !true }, to_dir: if lsplit[2] == "+" { !false } else { !true }})
+            es.push(Edge{from: lsplit[1].parse().unwrap() , to: lsplit[3].parse().unwrap() , from_dir: if lsplit[2] == "+" { !false } else { !true }, to_dir: if lsplit[4] == "+" { !false } else { !true }})
 
         }
 
