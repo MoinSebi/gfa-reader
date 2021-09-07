@@ -67,7 +67,7 @@ impl Gfa{
             let line_split: Vec<&str> = l.split("\t").collect();
             if l.starts_with("S") {
                 if self.nodes.contains_key(&String::from(line_split[1])){
-                    eprintln!("Warining: Duplicated node if found");
+                    eprintln!("Warning: Duplicated node id found");
                 }
                 self.nodes.insert(String::from(line_split[1]), Node { id: String::from(line_split[1]), seq: String::from(line_split[2]), len: line_split[2].len() });
 
