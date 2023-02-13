@@ -1,15 +1,10 @@
-# gfaR - gfa reader
+# gfa-reader - gfa reader
 
-Simple library for gfa files
+Simple library for gfa files (only v1). Has intrinsic 
 
-**Installation**:
-``` 
-cargo install gfaR
-
-[dependencies]
-gfaR = "0.1.2"
 ```
-
+git clone https://github.com/MoinSebi/gfa-reader
+```
 
 **Reading a graph**: 
 
