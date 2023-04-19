@@ -15,6 +15,7 @@ repository = "https://github.com/MoinSebi/gfaR"
 
 [dependencies]
 rand = "0.8.5"
+rayon = "1.6.1"
 
 [dev-dependencies]
 criterion = "0.3"
