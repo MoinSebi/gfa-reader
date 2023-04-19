@@ -121,7 +121,10 @@ impl Gfa {
     }
 }
 
-
+/// GFA wrapper
+///
+/// This is important for PanSN graphs
+/// Since the node space is the same, only path need to be merged (which can be done easily)
 pub struct GraphWrapper<'a>{
     pub genomes: Vec<(String, Vec<&'a Path>)>,
     pub path2genome: HashMap<&'a String, String>
@@ -133,50 +136,46 @@ impl <'a> GraphWrapper<'a>{
         Self{
             genomes: Vec::new(),
             path2genome: HashMap::new(),
-
         }
     }
 
 
 
-    /// NGFA -> Graphwrapper
+    /// GFA -> Wrapper
     /// If delimiter == " " (nothing)
     ///     -> No merging
     pub fn from_ngfa(& mut self, graph: &'a Gfa, del: &str) {
-        let mut h: HashMap<String, Vec<&'a Path>> = HashMap::new();
+        let mut name2pathvec: HashMap<String, Vec<&'a Path>> = HashMap::new();
         if del == " " {
-            for x in graph.paths.iter() {
-                h.insert(x.name.clone(), vec![x]);
+            for path in graph.paths.iter() {
+                name2pathvec.insert(path.name.clone(), vec![path]);
             }
         } else {
-            for x in graph.paths.iter() {
-                let j: Vec<&str> = x.name.split(del).collect();
-                let k = j[0].clone();
-                if h.contains_key(&k.to_owned().clone()) {
-                    h.get_mut(&k.to_owned().clone()).unwrap().push(x)
+            for path in graph.paths.iter() {
+                let name_split: Vec<&str> = path.name.split(del).collect();
+                let name_first = name_split[0].clone();
+                if name2pathvec.contains_key(&name_first.to_owned().clone()) {
+                    name2pathvec.get_mut(&name_first.to_owned().clone()).unwrap().push(path)
                 } else {
-                    h.insert(k.to_owned().clone(), vec![x]);
+                    name2pathvec.insert(name_first.to_owned().clone(), vec![path]);
                 }
             }
         }
-        let mut v: Vec<(String, Vec<&'a Path>)> = Vec::new();
-        let mut keyy : Vec<String> = h.keys().cloned().collect();
-        keyy.sort();
-        for x in keyy.iter(){
-            v.push((x.clone(), h.get(x).unwrap().clone()));
+        let mut name2path_value: Vec<(String, Vec<&'a Path>)> = Vec::new();
+        let mut path_names: Vec<String> = name2pathvec.keys().cloned().collect();
+        path_names.sort();
+        for path_name in path_names.iter(){
+            name2path_value.push((path_name.clone(), name2pathvec.get(path_name).unwrap().clone()));
         }
-        let mut j = HashMap::new();
-        for (k,v) in v.iter(){
-            for x in v.iter(){
-                j.insert(&x.name, k.to_owned());
+        let mut name2group = HashMap::new();
+        for (name, group) in name2path_value.iter(){
+            for path in group.iter(){
+                name2group.insert(&path.name, name.to_owned());
             }
         }
-
-        self.path2genome = j;
-        self.genomes = v;
+        self.path2genome = name2group;
+        self.genomes = name2path_value;
     }
-
-
 }
 
 
