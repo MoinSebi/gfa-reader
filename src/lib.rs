@@ -122,6 +122,64 @@ impl Gfa {
 }
 
 
+pub struct GraphWrapper<'a>{
+    pub genomes: Vec<(String, Vec<&'a Path>)>,
+    pub path2genome: HashMap<&'a String, String>
+}
+
+
+impl <'a> GraphWrapper<'a>{
+    pub fn new() -> Self{
+        Self{
+            genomes: Vec::new(),
+            path2genome: HashMap::new(),
+
+        }
+    }
+
+
+
+    /// NGFA -> Graphwrapper
+    /// If delimiter == " " (nothing)
+    ///     -> No merging
+    pub fn from_ngfa(& mut self, graph: &'a Gfa, del: &str) {
+        let mut h: HashMap<String, Vec<&'a Path>> = HashMap::new();
+        if del == " " {
+            for x in graph.paths.iter() {
+                h.insert(x.name.clone(), vec![x]);
+            }
+        } else {
+            for x in graph.paths.iter() {
+                let j: Vec<&str> = x.name.split(del).collect();
+                let k = j[0].clone();
+                if h.contains_key(&k.to_owned().clone()) {
+                    h.get_mut(&k.to_owned().clone()).unwrap().push(x)
+                } else {
+                    h.insert(k.to_owned().clone(), vec![x]);
+                }
+            }
+        }
+        let mut v: Vec<(String, Vec<&'a Path>)> = Vec::new();
+        let mut keyy : Vec<String> = h.keys().cloned().collect();
+        keyy.sort();
+        for x in keyy.iter(){
+            v.push((x.clone(), h.get(x).unwrap().clone()));
+        }
+        let mut j = HashMap::new();
+        for (k,v) in v.iter(){
+            for x in v.iter(){
+                j.insert(&x.name, k.to_owned());
+            }
+        }
+
+        self.path2genome = j;
+        self.genomes = v;
+    }
+
+
+}
+
+
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 
 
