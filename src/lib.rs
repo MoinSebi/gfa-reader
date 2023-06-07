@@ -25,6 +25,8 @@ impl Header {
     }
 }
 
+#[derive(Debug)]
+/// Optional fields for GFA 1/2
 pub struct opt_elem{
     pub key: String,
     pub typ: String,
@@ -51,16 +53,24 @@ impl opt_elem{
 /// involve just storing [u8]
 pub struct Node{
     pub id: String,
-    pub len: usize,
     pub seq: String,
+    pub opt: Vec<opt_elem>,
 }
 
 impl Node {
 
     // Write node to string
-    fn to_string1(&self) -> String {
-        format!("S\t{}\t{}\t{}", self.id, self.len, self.seq)
+    fn to_string(&self) -> String {
+        let a = format!("S\t{}\t{}\n", self.id, self.seq.len());
+        if self.opt.len() > 0 {
+            let b: Vec<String> = self.opt.iter().map(|a| a.to_string1()).collect();
+            let c = b.join("\t");
+            format!("{}{}\n", a, c)
+        } else {
+            a
+        }
     }
+
     // Write node to fasta
     fn to_fasta(&self) -> String {
         format!(">{}\n{}", self.id, self.seq)
@@ -156,8 +166,24 @@ impl Gfa {
             for line in reader.lines() {
                 let l = line.unwrap();
                 let line_split: Vec<&str> = l.split("\t").collect();
-                if l.starts_with("S") {
-                    self.nodes.insert(String::from(line_split[1]), Node { id: String::from(line_split[1]), seq: String::from(line_split[2]), len: line_split[2].len() });
+                if line_split[0] == "S" {
+                    let mut node: Node = Node { id: "".to_string(), seq: "".to_string(), opt: Vec::new() };
+                    node.seq = line_split[2].to_string();
+                    node.id = line_split[1].to_string();
+                    node.opt = Vec::new();
+
+                    if line_split.len() > 3 {
+                        for x in line_split.iter().skip(3){
+                            let mut opt: opt_elem = opt_elem{ key: "".to_string(), typ: "".to_string(), val: "".to_string() };
+                            let opt_split: Vec<&str> = x.split(":").collect();
+                            opt.key = opt_split[0].to_string();
+                            opt.typ = opt_split[1].to_string();
+                            opt.val = opt_split[2].to_string();
+                            node.opt.push(opt);
+                        }
+                    }
+                    self.nodes.insert(node.id.clone(), node);
+
                 } else if l.starts_with("P") {
                     let name: String = String::from(line_split[1]);
                     let dirs: Vec<bool> = line_split[2].split(",").map(|d| if &d[d.len() - 1..] == "+" { !false } else { !true }).collect();
@@ -598,7 +624,7 @@ pub fn read_file_in_parallel(file_path: &str) {
 pub fn from_Gfa(graph: Gfa) -> NGfa{
     let mut new_graph = NGfa::with_capacity(graph.nodes.len(), graph.paths.len(), graph.edges.len());
     for x in graph.nodes.into_iter() {
-        new_graph.nodes.insert(x.0.parse().unwrap(), NNode { seq: x.1.seq, len: x.1.len, id: x.1.id.parse().unwrap() });
+        new_graph.nodes.insert(x.0.parse().unwrap(), NNode { seq: x.1.seq, len: 0, id: x.1.id.parse().unwrap() });
     }
     for path in graph.paths.into_iter(){
         let ids: Vec<u32> = path.nodes.into_iter().map(|n| n.parse().unwrap()).collect();
