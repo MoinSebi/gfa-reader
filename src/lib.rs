@@ -102,7 +102,23 @@ pub struct Path{
     pub name: String,
     pub dir: Vec<bool>,
     pub nodes: Vec<String>,
+    pub overlap: Vec<String>,
 }
+
+impl Path {
+
+    // Write path to string (GFA1 format)
+    fn to_string(&self) -> String {
+        let a = format!("P\t{}\t", self.name);
+        let f1: Vec<String> = self.nodes.iter().zip(&self.dir).map(|n| format!("{}{}", n.0, {if *n.1{"+".to_string()} else {"-".to_string()}})).collect();
+        let f2 = f1.join(",");
+        let f: Vec<String> = self.overlap.iter().map(|a| a.to_string()).collect();
+        let g = f.join(",");
+        format!("{}\t{}\t{}\n", a, f2, g)
+    }
+}
+
+
 
 
 
@@ -188,7 +204,7 @@ impl Gfa {
                     let name: String = String::from(line_split[1]);
                     let dirs: Vec<bool> = line_split[2].split(",").map(|d| if &d[d.len() - 1..] == "+" { !false } else { !true }).collect();
                     let node_id: Vec<String> = line_split[2].split(",").map(|d| d[..d.len() - 1].parse().unwrap()).collect();
-                    self.paths.push(Path { name: name, dir: dirs, nodes: node_id });
+                    self.paths.push(Path { name: name, dir: dirs, nodes: node_id, overlap: Vec::new() });
                 } else if l.starts_with("L") {
                     self.edges.push(Edge { from: line_split[1].parse().unwrap(), to: line_split[3].parse().unwrap(), from_dir: if line_split[2] == "+" { !false } else { !true }, to_dir: if line_split[4] == "+" { !false } else { !true } })
 
