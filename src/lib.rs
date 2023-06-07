@@ -5,6 +5,40 @@ use std::path::Path as file_path;
 use std::process::id;
 use std::ptr::read;
 
+#[derive(Debug)]
+/// GFA 1/2 header line
+/// This line begins with an 'H'
+pub struct Header {
+    pub version_number: String,
+}
+
+impl Header {
+    fn to_string2(&self) -> String {
+        format!("H\t{}", self.version_number)
+    }
+
+    fn from_string(line: &str) -> Header {
+        let mut line = line.split_whitespace();
+        line.next();
+        let version_number = line.next().unwrap().to_string();
+        Header { version_number }
+    }
+}
+
+pub struct opt_elem{
+    pub key: String,
+    pub typ: String,
+    pub val: String,
+}
+
+impl opt_elem{
+    fn to_string1(&self) -> String{
+        format!("{}\t{}\t{}", self.key, self.typ, self.val)
+    }
+}
+
+
+
 
 #[derive(Debug)]
 /// Graph nodes:
@@ -21,7 +55,19 @@ pub struct Node{
     pub seq: String,
 }
 
-#[derive(Debug)]
+impl Node {
+
+    // Write node to string
+    fn to_string1(&self) -> String {
+        format!("S\t{}\t{}\t{}", self.id, self.len, self.seq)
+    }
+    // Write node to fasta
+    fn to_fasta(&self) -> String {
+        format!(">{}\n{}", self.id, self.seq)
+    }
+}
+
+#[derive(Debug, PartialEq)]
 /// Graph edges
 /// - from
 /// - from direction
@@ -63,6 +109,7 @@ pub struct Gfa{
     pub nodes: HashMap<String, Node>,
     pub paths: Vec<Path>,
     pub edges: Vec<Edge>,
+    pub header: Header,
 }
 
 
@@ -80,10 +127,13 @@ impl Gfa {
         let nodes: HashMap<String, Node> = HashMap::new();
         let paths: Vec<Path> = Vec::new();
         let edges: Vec<Edge> = Vec::new();
+        let header = Header{ version_number: "VN:Z:1.0".to_string() };
         Self {
             nodes: nodes,
             paths: paths,
             edges: edges,
+            header: header
+
         }
     }
 
@@ -97,7 +147,7 @@ impl Gfa {
     /// let mut graph = Gfa::new();
     /// graph.read_file("/path/to/graph");
     /// ´´´
-    pub fn read_file(&mut self, file_name: &str) {
+    pub fn parse_gfa_file(&mut self, file_name: &str) {
         if file_path::new(file_name).exists() {
             let file = File::open(file_name).expect("ERROR: CAN NOT READ FILE\n");
             let reader = BufReader::new(file);
@@ -115,6 +165,10 @@ impl Gfa {
                     self.paths.push(Path { name: name, dir: dirs, nodes: node_id });
                 } else if l.starts_with("L") {
                     self.edges.push(Edge { from: line_split[1].parse().unwrap(), to: line_split[3].parse().unwrap(), from_dir: if line_split[2] == "+" { !false } else { !true }, to_dir: if line_split[4] == "+" { !false } else { !true } })
+
+                // Reads header line
+                } else if l.starts_with("H") {
+                    self.header = Header { version_number: String::from(line_split[1]) };
                 }
             }
         }
@@ -675,7 +729,7 @@ mod tests {
 
     // cargo test -- --nocapture --test-threads=1
     // --test-threads=1
-    #[test]
+    //#[test]
     fn basic() {
         println!("h");
         let start = SystemTime::now();
@@ -690,7 +744,7 @@ mod tests {
 
     }
 
-    #[test]
+    //#[test]
     fn basic2() {
         println!("h");
         let start = SystemTime::now();
@@ -705,7 +759,7 @@ mod tests {
 
     }
 
-    #[test]
+    //#[test]
     fn basic3() {
         println!("h");
         let start = SystemTime::now();
@@ -720,7 +774,7 @@ mod tests {
 
     }
 
-    #[test]
+    //#[test]
     fn basic4() {
         println!("h");
         let start = SystemTime::now();

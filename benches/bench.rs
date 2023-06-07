@@ -7,7 +7,7 @@ use gfa_reader::{Gfa, NGfa, NGfa2, read_file_in_parallel};
 /// Read a normal graph
 fn gfa_normal(filename: &str){
     let mut graph = Gfa::new();
-    graph.read_file(filename)
+    graph.parse_gfa_file(filename)
     //sort_vector(&mut intervals);
 }
 
