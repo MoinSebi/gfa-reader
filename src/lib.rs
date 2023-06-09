@@ -25,7 +25,7 @@ impl Header {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 /// Optional fields for GFA 1/2
 pub struct opt_elem{
     pub key: String,
@@ -83,6 +83,9 @@ impl Node {
 /// - from direction
 /// - to
 /// - to direction
+/// - Overlap (Link + containment)
+/// - Pos
+/// - Ops
 ///
 /// Comment:
 /// Edges go forward (true) or backward (false) to/from a node.
@@ -91,7 +94,27 @@ pub struct Edge{
     pub from_dir: bool,
     pub to: String,
     pub to_dir: bool,
+    pub overlap: String,
+    pub opt: Vec<opt_elem>,
 }
+
+impl Edge {
+
+    // Write edge to string
+    fn to_string(&self) -> String {
+        let a = format!("L\t{}\t{}\t{}\t{}\t{}\n", self.from, {if self.from_dir{"+"} else {"-"}}, self.to, {if self.to_dir{"+"} else {"-"}}, self.overlap);
+        if self.opt.len() > 0 {
+            let b: Vec<String> = self.opt.iter().map(|a| a.to_string1()).collect();
+            let c = b.join("\t");
+            format!("{}{}\n", a, c)
+        } else {
+            a
+        }
+    }
+}
+
+
+
 
 #[derive(Debug)]
 /// Path features:
@@ -206,7 +229,7 @@ impl Gfa {
                     let node_id: Vec<String> = line_split[2].split(",").map(|d| d[..d.len() - 1].parse().unwrap()).collect();
                     self.paths.push(Path { name: name, dir: dirs, nodes: node_id, overlap: Vec::new() });
                 } else if l.starts_with("L") {
-                    self.edges.push(Edge { from: line_split[1].parse().unwrap(), to: line_split[3].parse().unwrap(), from_dir: if line_split[2] == "+" { !false } else { !true }, to_dir: if line_split[4] == "+" { !false } else { !true } })
+                    self.edges.push(Edge { from: line_split[1].parse().unwrap(), to: line_split[3].parse().unwrap(), from_dir: if line_split[2] == "+" { !false } else { !true }, to_dir: if line_split[4] == "+" { !false } else { !true }, overlap: line_split[5].parse().unwrap(), opt: Vec::new() });
 
                 // Reads header line
                 } else if l.starts_with("H") {
