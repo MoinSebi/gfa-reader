@@ -1,6 +1,6 @@
 # gfa-reader - gfa reader
 
-Simple library for gfa files (only v1). Has intrinsic 
+Library for reading gfa (v1) files. 
 
 ```
 git clone https://github.com/MoinSebi/gfa-reader
@@ -10,5 +10,5 @@ git clone https://github.com/MoinSebi/gfa-reader
 
 ```
 let graph = Gfa::new(); 
-graph.read_file("file.gfa"); 
+graph.parse_gfa_file("file.gfa"); 
 ``` 

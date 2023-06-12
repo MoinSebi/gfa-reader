@@ -4,6 +4,8 @@ use std::io::{prelude::*, BufReader};
 use std::path::Path as file_path;
 use std::process::id;
 use std::ptr::read;
+use flate2::read::GzDecoder;
+
 
 #[derive(Debug)]
 /// GFA 1/2 header line
@@ -94,14 +96,24 @@ pub struct Edge{
     pub from_dir: bool,
     pub to: String,
     pub to_dir: bool,
+    pub pos : usize, // Position of the overlap
     pub overlap: String,
     pub opt: Vec<opt_elem>,
+    pub type_: EdgeType,
+}
+
+#[derive(Debug, PartialEq)]
+/// Data type for edge type
+pub enum EdgeType {
+    Link,
+    Containment,
+    Other
 }
 
 impl Edge {
 
     // Write edge to string
-    fn to_string(&self) -> String {
+    fn to_string_link(&self) -> String {
         let a = format!("L\t{}\t{}\t{}\t{}\t{}\n", self.from, {if self.from_dir{"+"} else {"-"}}, self.to, {if self.to_dir{"+"} else {"-"}}, self.overlap);
         if self.opt.len() > 0 {
             let b: Vec<String> = self.opt.iter().map(|a| a.to_string1()).collect();
@@ -185,6 +197,9 @@ impl Gfa {
 
         }
     }
+    // Open a gzip file and import the crate
+
+
 
 
     /// Read the graph from a file
@@ -194,12 +209,17 @@ impl Gfa {
     /// ```rust, ignore
     /// use gfa_reader::Gfa;
     /// let mut graph = Gfa::new();
-    /// graph.read_file("/path/to/graph");
+    /// graph.parse_gfa_file("/path/to/graph");
     /// ´´´
     pub fn parse_gfa_file(&mut self, file_name: &str) {
         if file_path::new(file_name).exists() {
             let file = File::open(file_name).expect("ERROR: CAN NOT READ FILE\n");
-            let reader = BufReader::new(file);
+
+            let reader: Box<dyn BufRead> = if file_name.ends_with(".gz") {
+                Box::new(BufReader::new(GzDecoder::new(file)))
+            } else {
+                Box::new(BufReader::new(file))
+            };
 
             // Iterate over lines
             for line in reader.lines() {
@@ -229,9 +249,10 @@ impl Gfa {
                     let node_id: Vec<String> = line_split[2].split(",").map(|d| d[..d.len() - 1].parse().unwrap()).collect();
                     self.paths.push(Path { name: name, dir: dirs, nodes: node_id, overlap: Vec::new() });
                 } else if l.starts_with("L") {
-                    self.edges.push(Edge { from: line_split[1].parse().unwrap(), to: line_split[3].parse().unwrap(), from_dir: if line_split[2] == "+" { !false } else { !true }, to_dir: if line_split[4] == "+" { !false } else { !true }, overlap: line_split[5].parse().unwrap(), opt: Vec::new() });
-
-                // Reads header line
+                    self.edges.push(Edge { from: line_split[1].parse().unwrap(), to: line_split[3].parse().unwrap(), from_dir: if line_split[2] == "+" { !false } else { !true }, to_dir: if line_split[4] == "+" { !false } else { !true }, overlap: line_split[5].parse().unwrap(), opt: Vec::new(), type_: EdgeType::Link, pos: 0});
+                } else if l.starts_with("C ") {
+                    let ll: usize = line_split[5].parse().unwrap();
+                    self.edges.push(Edge { from: line_split[1].parse().unwrap(), to: line_split[3].parse().unwrap(), from_dir: if line_split[2] == "+" { !false } else { !true }, to_dir: if line_split[4] == "+" { !false } else { !true }, overlap: line_split[5].parse().unwrap(), opt: Vec::new(), type_: EdgeType::Containment, pos: ll});
                 } else if l.starts_with("H") {
                     self.header = Header { version_number: String::from(line_split[1]) };
                 }
@@ -239,6 +260,25 @@ impl Gfa {
         }
     }
 }
+
+
+// Function for read gzipped file and return a buffered reader
+fn read_gzipped_file(file_name: &str) -> BufReader<GzDecoder<File>> {
+    let file = File::open(file_name).expect("ERROR: CAN NOT READ FILE\n");
+    let gz = GzDecoder::new(file);
+    BufReader::new(gz)
+
+}
+
+fn test(aa: BufReader<GzDecoder<File>>){
+    for line in aa.lines(){
+        let l = line.unwrap();
+        println!("{}", l);
+    }
+}
+
+
+
 
 /// GFA wrapper
 ///
