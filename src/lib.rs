@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{prelude::*, BufReader};
+use std::io::{BufWriter, Write};
 use std::path::Path as file_path;
 use std::process::id;
 use std::ptr::read;
@@ -221,10 +222,14 @@ impl Gfa {
                 Box::new(BufReader::new(file))
             };
 
+            let mut nodes = Vec::new();
+
             // Iterate over lines
             for line in reader.lines() {
                 let l = line.unwrap();
                 let line_split: Vec<&str> = l.split("\t").collect();
+
+                // If line is segment
                 if line_split[0] == "S" {
                     let mut node: Node = Node { id: "".to_string(), seq: "".to_string(), opt: Vec::new() };
                     node.seq = line_split[2].to_string();
@@ -241,41 +246,92 @@ impl Gfa {
                             node.opt.push(opt);
                         }
                     }
-                    self.nodes.insert(node.id.clone(), node);
+                    nodes.push((node.id.clone(), node));
+
+                } else if l.starts_with("L") {
+                    let mut edge = Edge { from: "".to_string(), to: "".to_string(), from_dir: false, to_dir: false, overlap: "0".to_string(), opt: Vec::new(), type_: EdgeType::Link, pos: 0};
+                    edge.from = line_split[1].parse().unwrap();
+                    edge.to = line_split[3].parse().unwrap();
+                    edge.to_dir = if line_split[4] == "+" { !false } else { !true };
+                    edge.from_dir = if line_split[2] == "+" { !false } else { !true };
+                    edge.overlap = line_split[5].parse().unwrap();
+                    edge.type_ = EdgeType::Link;
+                    if line_split.len() > 6 {
+                        for x in line_split.iter().skip(6){
+                            let mut opt: opt_elem = opt_elem{ key: "".to_string(), typ: "".to_string(), val: "".to_string() };
+                            let opt_split: Vec<&str> = x.split(":").collect();
+                            opt.key = opt_split[0].to_string();
+                            opt.typ = opt_split[1].to_string();
+                            opt.val = opt_split[2].to_string();
+                            edge.opt.push(opt);
+                        }
+                    }
+                    self.edges.push(edge);
+                } else if l.starts_with("C ") {
+                    let ll: usize = line_split[5].parse().unwrap();
+                    let mut edge = Edge { from: "".to_string(), to: "".to_string(), from_dir: false, to_dir: false, overlap: "0".to_string(), opt: Vec::new(), type_: EdgeType::Link, pos: 0};
+                    edge.from = line_split[1].parse().unwrap();
+                    edge.to = line_split[3].parse().unwrap();
+                    edge.to_dir = if line_split[4] == "+" { !false } else { !true };
+                    edge.from_dir = if line_split[2] == "+" { !false } else { !true };
+                    edge.overlap = line_split[5].parse().unwrap();
+                    edge.type_ = EdgeType::Containment;
+                    edge.pos = ll;
+                    if line_split.len() > 7 {
+                        for x in line_split.iter().skip(7){
+                            let mut opt: opt_elem = opt_elem{ key: "".to_string(), typ: "".to_string(), val: "".to_string() };
+                            let opt_split: Vec<&str> = x.split(":").collect();
+                            opt.key = opt_split[0].to_string();
+                            opt.typ = opt_split[1].to_string();
+                            opt.val = opt_split[2].to_string();
+                            edge.opt.push(opt);
+                        }
+                    }
+                    self.edges.push(edge);
+
 
                 } else if l.starts_with("P") {
                     let name: String = String::from(line_split[1]);
                     let dirs: Vec<bool> = line_split[2].split(",").map(|d| if &d[d.len() - 1..] == "+" { !false } else { !true }).collect();
                     let node_id: Vec<String> = line_split[2].split(",").map(|d| d[..d.len() - 1].parse().unwrap()).collect();
-                    self.paths.push(Path { name: name, dir: dirs, nodes: node_id, overlap: Vec::new() });
-                } else if l.starts_with("L") {
-                    self.edges.push(Edge { from: line_split[1].parse().unwrap(), to: line_split[3].parse().unwrap(), from_dir: if line_split[2] == "+" { !false } else { !true }, to_dir: if line_split[4] == "+" { !false } else { !true }, overlap: line_split[5].parse().unwrap(), opt: Vec::new(), type_: EdgeType::Link, pos: 0});
-                } else if l.starts_with("C ") {
-                    let ll: usize = line_split[5].parse().unwrap();
-                    self.edges.push(Edge { from: line_split[1].parse().unwrap(), to: line_split[3].parse().unwrap(), from_dir: if line_split[2] == "+" { !false } else { !true }, to_dir: if line_split[4] == "+" { !false } else { !true }, overlap: line_split[5].parse().unwrap(), opt: Vec::new(), type_: EdgeType::Containment, pos: ll});
+                    let mut overlap = Vec::new();
+                    if line_split.len() > 3{
+                        overlap = line_split[3].split(",").map(|d| d.parse().unwrap()).collect();
+                    } else {
+                        overlap  = vec!["*".to_string(); node_id.len()];
+                    }
+                    self.paths.push(Path { name: name, dir: dirs, nodes: node_id, overlap: overlap})
+
+
                 } else if l.starts_with("H") {
                     self.header = Header { version_number: String::from(line_split[1]) };
                 }
+
             }
+            self.nodes = HashMap::with_capacity(nodes.len());
+            self.nodes.extend(nodes.into_iter());
+
+        }
+    }
+
+    /// Write the graph to a file
+    pub fn to_file(self, file_name: &str){
+        let f = File::create(file_name).expect("Unable to create file");
+        let mut f = BufWriter::new(f);
+
+        write!(f, "{}\n",  self.header.to_string2());
+        for node in self.nodes.iter() {
+            write!(f, "{}\n", node.1.to_string()).expect("Not able to write");
+        }
+        for edge in self.edges.iter() {
+            write!(f, "{}\n", edge.to_string_link()).expect("Not able to write");
+        }
+        for path in self.paths.iter() {
+            write!(f, "{}\n", path.to_string()).expect("Not able to write");
         }
     }
 }
 
-
-// Function for read gzipped file and return a buffered reader
-fn read_gzipped_file(file_name: &str) -> BufReader<GzDecoder<File>> {
-    let file = File::open(file_name).expect("ERROR: CAN NOT READ FILE\n");
-    let gz = GzDecoder::new(file);
-    BufReader::new(gz)
-
-}
-
-fn test(aa: BufReader<GzDecoder<File>>){
-    for line in aa.lines(){
-        let l = line.unwrap();
-        println!("{}", l);
-    }
-}
 
 
 
@@ -480,7 +536,6 @@ impl NGfa {
                     self.edges.push(NEdge { from: line_split[1].parse().unwrap(), to: line_split[3].parse().unwrap(), from_dir:  line_split[2] == "+" , to_dir: line_split[4] == "+" })
                 }
             }
-            self.nodes.extend(nodes.into_iter());
             self.nodes.shrink_to_fit();
             self.edges.shrink_to_fit();
             self.paths.shrink_to_fit();
