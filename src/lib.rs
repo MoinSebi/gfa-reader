@@ -16,10 +16,12 @@ pub struct Header {
 }
 
 impl Header {
-    fn to_string2(&self) -> String {
+    /// Write header to string
+    fn to_string1(&self) -> String {
         format!("H\t{}", self.version_number)
     }
 
+    /// Parse header from string
     fn from_string(line: &str) -> Header {
         let mut line = line.split_whitespace();
         line.next();
@@ -37,6 +39,8 @@ pub struct opt_elem{
 }
 
 impl opt_elem{
+
+    /// Write optional field to string
     fn to_string1(&self) -> String{
         format!("{}\t{}\t{}", self.key, self.typ, self.val)
     }
@@ -62,7 +66,7 @@ pub struct Node{
 
 impl Node {
 
-    // Write node to string
+    /// Write node to string
     fn to_string(&self) -> String {
         let a = format!("S\t{}\t{}\n", self.id, self.seq.len());
         if self.opt.len() > 0 {
@@ -74,7 +78,7 @@ impl Node {
         }
     }
 
-    // Write node to fasta
+    /// Write node to fasta
     fn to_fasta(&self) -> String {
         format!(">{}\n{}", self.id, self.seq)
     }
@@ -113,7 +117,7 @@ pub enum EdgeType {
 
 impl Edge {
 
-    // Write edge to string
+    /// Write edge to string
     fn to_string_link(&self) -> String {
         let a = format!("L\t{}\t{}\t{}\t{}\t{}\n", self.from, {if self.from_dir{"+"} else {"-"}}, self.to, {if self.to_dir{"+"} else {"-"}}, self.overlap);
         if self.opt.len() > 0 {
@@ -143,7 +147,7 @@ pub struct Path{
 
 impl Path {
 
-    // Write path to string (GFA1 format)
+    /// Write path to string (GFA1 format)
     fn to_string(&self) -> String {
         let a = format!("P\t{}\t", self.name);
         let f1: Vec<String> = self.nodes.iter().zip(&self.dir).map(|n| format!("{}{}", n.0, {if *n.1{"+".to_string()} else {"-".to_string()}})).collect();
@@ -319,7 +323,7 @@ impl Gfa {
         let f = File::create(file_name).expect("Unable to create file");
         let mut f = BufWriter::new(f);
 
-        write!(f, "{}\n",  self.header.to_string2());
+        write!(f, "{}\n",  self.header.to_string1());
         for node in self.nodes.iter() {
             write!(f, "{}\n", node.1.to_string()).expect("Not able to write");
         }
@@ -359,7 +363,7 @@ impl <'a> GraphWrapper<'a>{
     /// GFA -> Wrapper
     /// If delimiter == " " (nothing)
     ///     -> No merging
-    pub fn from_ngfa(& mut self, graph: &'a Gfa, del: &str) {
+    pub fn from_gfa(& mut self, graph: &'a Gfa, del: &str) {
         let mut name2pathvec: HashMap<String, Vec<&'a Path>> = HashMap::new();
         if del == " " {
             for path in graph.paths.iter() {
@@ -420,7 +424,6 @@ pub struct NCGfa{
 #[derive(Debug, Clone)]
 /// Graph nodes:
 /// - identifier
-/// - length of the sequence
 /// - sequence
 ///
 /// Comment:
@@ -558,6 +561,8 @@ pub struct NCGraphWrapper<'a>{
 
 
 impl <'a> NCGraphWrapper<'a>{
+
+    /// Constructor (empty)
     pub fn new() -> Self{
         Self{
             genomes: Vec::new(),
@@ -606,6 +611,8 @@ impl <'a> NCGraphWrapper<'a>{
 
 
 
+
+// Have a collection of intervals and query and find those intervals that overlap with the query. Use crates if possible. Create a function to do this
 
 
 
