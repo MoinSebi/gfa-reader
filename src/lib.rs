@@ -60,6 +60,8 @@ pub trait OptFields: Sized + Default + Clone {
     /// rather than `Option<Self>` for now, but this may be changed to
     /// become fallible in the future.
     fn parse(input: Vec<&str>) -> Self;
+
+
 }
 
 /// This implementation is useful for performance if we don't actually
@@ -74,6 +76,7 @@ impl OptFields for () {
     fn parse(_input: Vec<&str>) -> Self
     {
     }
+
 }
 
 /// Stores all the optional fields in a vector. `get_field` simply
@@ -110,19 +113,21 @@ impl OptFields for Vec<opt_elem> {
 /// Comment:
 /// Sequence is stored as String which is (in most cases) very memory heavy. Future changed might
 /// involve just storing [u8]
-pub struct Node{
+pub struct Node<T: OptFields>{
     pub id: String,
     pub seq: String,
-    pub opt: Vec<opt_elem>,
+    pub opt: T,
 }
 
-impl Node {
+impl <T: OptFields>Node<T> {
 
     /// Write node to string
     fn to_string(&self) -> String {
         let a = format!("S\t{}\t{}\n", self.id, self.seq.len());
-        if self.opt.len() > 0 {
-            let b: Vec<String> = self.opt.iter().map(|a| a.to_string1()).collect();
+        let b: Vec<String> = self.opt.fields().iter().map(|a| a.to_string1()).collect();
+
+        if self.opt.fields().len() > 0 {
+            let b: Vec<String> = self.opt.fields().iter().map(|a| a.to_string1()).collect();
             let c = b.join("\t");
             format!("{}{}\n", a, c)
         } else {
@@ -223,26 +228,26 @@ impl Path {
 /// Comment: This implementation should be able to parse any kind of GFAv1, but has increased
 /// memory consumption, since many parts are stored at Strings which are a minimum of 24 bytes.
 /// This is only maintained, since it is not of further use in any of my projects.
-pub struct Gfa{
-    pub nodes: HashMap<String, Node>,
+pub struct Gfa<T: OptFields>{
+    pub nodes: HashMap<String, Node<T>>,
     pub paths: Vec<Path>,
     pub edges: Vec<Edge>,
     pub header: Header,
 }
 
 
-impl Gfa {
+impl <T: OptFields>Gfa <T>{
     /// Graph constructor
     ///
     /// # Example
     ///
     /// ```
     /// use gfa_reader::Gfa;
-    /// let graph = Gfa::new();
+    /// let graph: Gfa<()> = Gfa::new();
     ///
     /// ```
     pub fn new() -> Self {
-        let nodes: HashMap<String, Node> = HashMap::new();
+        let nodes: HashMap<String, Node<T>> = HashMap::new();
         let paths: Vec<Path> = Vec::new();
         let edges: Vec<Edge> = Vec::new();
         let header = Header{ version_number: "VN:Z:1.0".to_string() };
@@ -278,7 +283,7 @@ impl Gfa {
                 Box::new(BufReader::new(file))
             };
 
-            let mut nodes = Vec::new();
+            let mut nodes: Vec<(String, Node<T>)> = Vec::new();
 
             // Iterate over lines
             for line in reader.lines() {
@@ -287,22 +292,21 @@ impl Gfa {
 
                 // If line is segment
                 if line_split[0] == "S" {
-                    let mut node: Node = Node { id: "".to_string(), seq: "".to_string(), opt: Vec::new() };
-                    node.seq = line_split[2].to_string();
-                    node.id = line_split[1].to_string();
-                    node.opt = Vec::new();
+                    let seq = line_split[2].to_string();
+                    let id  = line_split[1].to_string();
+
 
                     if line_split.len() > 3 {
-                        for x in line_split.iter().skip(3){
-                            let mut opt: opt_elem = opt_elem{ key: "".to_string(), typ: "".to_string(), val: "".to_string() };
-                            let opt_split: Vec<&str> = x.split(":").collect();
-                            opt.key = opt_split[0].to_string();
-                            opt.typ = opt_split[1].to_string();
-                            opt.val = opt_split[2].to_string();
-                            node.opt.push(opt);
-                        }
+                        let mut opt2: Vec<opt_elem> = Vec::new();
+                        let f = OptFields::parse(line_split);
+                        nodes.push((id.clone(), Node { id: id, seq: seq, opt: f }));
+
                     }
-                    nodes.push((node.id.clone(), node));
+                    else {
+                        let f = OptFields::parse(line_split);
+                        nodes.push((id.clone(), Node { id: id, seq: seq, opt: f }));
+
+                    }
 
                 } else if l.starts_with("L") {
                     let mut edge = Edge { from: "".to_string(), to: "".to_string(), from_dir: false, to_dir: false, overlap: "0".to_string(), opt: Vec::new(), type_: EdgeType::Link, pos: 0};
@@ -415,7 +419,7 @@ impl <'a> GraphWrapper<'a>{
     /// GFA -> Wrapper
     /// If delimiter == " " (nothing)
     ///     -> No merging
-    pub fn from_gfa(& mut self, graph: &'a Gfa, del: &str) {
+    pub fn from_gfa(& mut self, graph: &'a Gfa<()>, del: &str) {
         let mut name2pathvec: HashMap<String, Vec<&'a Path>> = HashMap::new();
         if del == " " {
             for path in graph.paths.iter() {
