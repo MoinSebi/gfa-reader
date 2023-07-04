@@ -30,7 +30,7 @@ impl Header {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 /// Optional fields for GFA 1/2
 pub struct opt_elem{
     pub key: String,
@@ -48,12 +48,64 @@ impl opt_elem{
 
 
 
+pub trait OptFields: Sized + Default + Clone {
+
+    /// Return a slice over all optional fields. NB: This may be
+    /// replaced by an iterator or something else in the future
+    fn fields(&self) -> &[opt_elem];
+
+    /// Given an iterator over bytestrings, each expected to hold one
+    /// optional field (in the <TAG>:<TYPE>:<VALUE> format), parse
+    /// them as optional fields to create a collection. Returns `Self`
+    /// rather than `Option<Self>` for now, but this may be changed to
+    /// become fallible in the future.
+    fn parse(input: Vec<&str>) -> Self;
+}
+
+/// This implementation is useful for performance if we don't actually
+/// need any optional fields. () takes up zero space, and all
+/// methods are no-ops.
+impl OptFields for () {
+
+    fn fields(&self) -> &[opt_elem] {
+        &[]
+    }
+
+    fn parse(_input: Vec<&str>) -> Self
+    {
+    }
+}
+
+/// Stores all the optional fields in a vector. `get_field` simply
+/// uses std::iter::Iterator::find(), but as there are only a
+/// relatively small number of optional fields in practice, it should
+/// be efficient enough.
+impl OptFields for Vec<opt_elem> {
+
+    fn fields(&self) -> &[opt_elem] {
+        self.as_slice()
+    }
+
+    fn parse(input: Vec<&str>) -> Self{
+        let mut fields = Vec::new();
+        for field in input {
+            let mut parts = field.split(':');
+            let tag = parts.next().unwrap();
+            let typ = parts.next().unwrap();
+            let val = parts.next().unwrap();
+            fields.push(opt_elem{key: tag.to_string(), typ: typ.to_string(), val: val.to_string()});
+        }
+        fields
+    }
+}
+
+
 
 #[derive(Debug)]
 /// Graph nodes:
 /// - identifier
-/// - length of the sequence
 /// - sequence
+/// - Optional elements
 ///
 /// Comment:
 /// Sequence is stored as String which is (in most cases) very memory heavy. Future changed might
