@@ -259,7 +259,8 @@ impl <T: OptFields>Gfa <T>{
 
         }
     }
-    // Open a gzip file and import the crate
+
+
 
 
 
@@ -416,17 +417,19 @@ impl <'a> GraphWrapper<'a>{
 
 
 
+
+
     /// GFA -> Wrapper
     /// If delimiter == " " (nothing)
     ///     -> No merging
-    pub fn from_gfa(& mut self, graph: &'a Gfa<()>, del: &str) {
+    pub fn from_gfa(& mut self, paths: &'a Vec<Path>, del: &str) {
         let mut name2pathvec: HashMap<String, Vec<&'a Path>> = HashMap::new();
         if del == " " {
-            for path in graph.paths.iter() {
+            for path in paths.iter() {
                 name2pathvec.insert(path.name.clone(), vec![path]);
             }
         } else {
-            for path in graph.paths.iter() {
+            for path in paths.iter() {
                 let name_split: Vec<&str> = path.name.split(del).collect();
                 let name_first = name_split[0].clone();
                 if name2pathvec.contains_key(&name_first.to_owned().clone()) {
@@ -474,6 +477,7 @@ pub struct NCGfa{
     pub nodes: Vec<NNode>,
     pub paths: Vec<NPath>,
     pub edges: Vec<NEdge>,
+    pub wrapper: Option<HashMap<String, usize>>,
 }
 
 
@@ -538,6 +542,7 @@ impl NCGfa {
             nodes: nodes,
             paths: paths,
             edges: edges,
+            wrapper: None,
         }
     }
 
@@ -555,8 +560,21 @@ impl NCGfa {
             nodes: Vec::with_capacity(nodes_number),
             paths: Vec::with_capacity(paths_number),
             edges: Vec::with_capacity(edge_number),
+            wrapper: None,
         }
     }
+
+    pub fn from_gfa(&mut self, graph: Gfa<()>) -> (bool, bool){
+
+        let nodes = graph.nodes.iter().map(|x| x.1.id.clone()).collect::<Vec<String>>();
+        let aa = nodes.iter().map(|x| x.chars().map(|g| g.is_ascii_digit()).collect::<Vec<bool>>().contains(&false)).collect::<Vec<bool>>().contains(&false);
+        let mut numeric_nodes = nodes.iter().map(|x| x.parse::<usize>().unwrap()).collect::<Vec<usize>>();
+        numeric_nodes.sort();
+        let f = numeric_nodes.windows(2).all(|pair| pair[1] == pair[0] + 1);
+        return (aa, f)
+
+    }
+
 
 
 
