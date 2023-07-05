@@ -656,7 +656,8 @@ impl NCGfa {
             self.edges = graph.edges.iter().map(|x| NEdge{from: x.from.parse().unwrap(), from_dir: x.from_dir, to: x.to.parse().unwrap(), to_dir: x.to_dir}).collect();
             self.paths = graph.paths.iter().map(|x| NPath{name: x.name.clone(), dir: x.dir.clone(), nodes: x.nodes.iter().map(|y| y.parse().unwrap()).collect()}).collect();
         } else {
-
+            let a = self.make_mapper(graph);
+            self.convert_with_mapper(a, graph);
         }
     }
 
