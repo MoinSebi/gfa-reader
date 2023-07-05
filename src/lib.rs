@@ -260,6 +260,45 @@ impl <T: OptFields>Gfa <T>{
         }
     }
 
+    /// Check if the nodes in the graph are
+    /// -nodes are present
+    /// -numeric
+    /// -compact
+    /// -start at X
+    pub fn check_nc(&mut self) -> (Option<Vec<usize>>, Option<usize>){
+
+        // If the graph is empty
+        if self.nodes.len() == 0 {
+            return (None, None)
+        }
+
+
+        // Check if the graph is numeric
+        let nodes = self.nodes.iter().map(|x| x.1.id.clone()).collect::<Vec<String>>();
+        let aa = nodes.iter().map(|x| x.chars().map(|g| g.is_ascii_digit()).collect::<Vec<bool>>().contains(&false)).collect::<Vec<bool>>().contains(&false);
+
+        // Check if the numeric nodes are compact
+        if aa {
+            let mut numeric_nodes = nodes.iter().map(|x| x.parse::<usize>().unwrap()).collect::<Vec<usize>>();
+            numeric_nodes.sort();
+
+
+            let f = numeric_nodes.windows(2).all(|pair| pair[1] == pair[0] + 1);
+            let mm = numeric_nodes.iter().cloned().min();
+            if (mm.unwrap()  as f64/ numeric_nodes.len() as f64) < 0.2 && f{
+                return (Some(numeric_nodes), mm)
+            }
+            else {
+                return (None, None)
+            }
+        } else {
+            return (None, None)
+        }
+
+
+
+    }
+
 
 
 
@@ -494,6 +533,19 @@ pub struct NNode {
     pub seq: String,
 }
 
+
+impl NNode {
+    pub fn to_string(&self, mapper: &Option<Vec<&String>>) -> String {
+        let mut a = "".to_string();
+        if Some(mapper) != None{
+            a = format!("S\t{}\t{}\n", self.id, self.seq.len());
+        } else {
+            a = format!("S\t{}\t{}\n", mapper.as_ref().unwrap()[self.id as usize], self.seq.len());
+        }
+        a
+    }
+}
+
 #[derive(Debug, Clone)]
 /// Graph edges
 /// - from
@@ -510,6 +562,19 @@ pub struct NEdge {
     pub to_dir: bool,
 }
 
+impl NEdge {
+    pub fn to_string(&self, mapper: &Option<Vec<String>>) -> String{
+        let mut a = "".to_string();
+        if Some(mapper) != None{
+            a = format!("L\t{}\t{}\t{}\t{}\n", mapper.as_ref().unwrap()[self.from as usize].clone(), {if self.from_dir{"+"} else {"-"}}, mapper.as_ref().unwrap()[self.to as usize].clone(), {if self.to_dir{"+"} else {"-"}});
+        } else {
+            a = format!("L\t{}\t{}\t{}\t{}\n", self.from, {if self.from_dir{"+"} else {"-"}}, self.to, {if self.to_dir{"+"} else {"-"}});
+        }
+        a
+    }
+
+}
+
 #[derive(Debug, Clone)]
 /// Path features:
 /// - names
@@ -520,6 +585,24 @@ pub struct NPath {
     pub dir: Vec<bool>,
     pub nodes: Vec<u32>,
 
+}
+
+impl NPath{
+    pub fn to_string(&self, mapper: &Option<Vec<&String>>) -> String{
+        let a = format!("P\t{}\t", self.name);
+        let mut vec: Vec<String> = Vec::new();
+        if Some(mapper) != None{
+            vec = self.nodes.iter().zip(&self.dir).map(|n| format!("{}{}", mapper.as_ref().unwrap()[*n.0 as usize], {if *n.1{"+".to_string()} else {"-".to_string()}})).collect();
+
+        } else {
+            vec = self.nodes.iter().zip(&self.dir).map(|n| format!("{}{}", n.0, {if *n.1{"+".to_string()} else {"-".to_string()}})).collect();
+
+        }
+
+        let f2 = vec.join(",");
+        format!("{}\t{}\n", a, f2)
+
+    }
 }
 
 impl NCGfa {
@@ -564,16 +647,41 @@ impl NCGfa {
         }
     }
 
-    pub fn from_gfa(&mut self, graph: Gfa<()>) -> (bool, bool){
 
-        let nodes = graph.nodes.iter().map(|x| x.1.id.clone()).collect::<Vec<String>>();
-        let aa = nodes.iter().map(|x| x.chars().map(|g| g.is_ascii_digit()).collect::<Vec<bool>>().contains(&false)).collect::<Vec<bool>>().contains(&false);
-        let mut numeric_nodes = nodes.iter().map(|x| x.parse::<usize>().unwrap()).collect::<Vec<usize>>();
-        numeric_nodes.sort();
-        let f = numeric_nodes.windows(2).all(|pair| pair[1] == pair[0] + 1);
-        return (aa, f)
+    pub fn from_gfa<T: OptFields>(&mut self, graph: &mut Gfa<T>) {
+        let a = graph.check_nc();
+        if a.0 != None{
+            let mut nodes: Vec<NNode> = Vec::with_capacity(a.0.unwrap().len() + a.1.unwrap());
+            graph.nodes.iter().for_each(|x| nodes[x.1.id.parse::<usize>().unwrap()] = NNode{id: x.1.id.parse::<u32>().unwrap(), seq: x.1.seq.clone()});
+            self.edges = graph.edges.iter().map(|x| NEdge{from: x.from.parse().unwrap(), from_dir: x.from_dir, to: x.to.parse().unwrap(), to_dir: x.to_dir}).collect();
+            self.paths = graph.paths.iter().map(|x| NPath{name: x.name.clone(), dir: x.dir.clone(), nodes: x.nodes.iter().map(|y| y.parse().unwrap()).collect()}).collect();
+        } else {
+
+        }
+    }
+
+    pub fn make_mapper<T: OptFields>(&mut self, graph: &mut Gfa<T>) -> HashMap<String, usize> {
+        let mut f = graph.nodes.iter().map(|x| x.1.id.clone()).collect::<Vec<String>>();
+        f.sort_by_key(|digit| digit.parse::<u32>().unwrap());
+        let mut wrapper = HashMap::new();
+        for (i, node) in f.iter().enumerate() {
+            wrapper.insert(node.clone(), i);
+        }
+        wrapper
+    }
+
+    pub fn convert_with_mapper<T: OptFields>(&mut self, mapper: HashMap<String, usize>, graph: &Gfa<T>){
+
+        self.nodes = graph.nodes.iter().map(|x| NNode{id: *mapper.get(&x.1.id).unwrap() as u32, seq: x.1.seq.clone()}).collect();
+        self.edges = graph.edges.iter().map(|x| NEdge{from: *mapper.get(&x.from).unwrap() as u32, from_dir: x.from_dir, to: *mapper.get(&x.to).unwrap() as u32, to_dir: x.to_dir}).collect();
+        self.paths = graph.paths.iter().map(|x| NPath{name: x.name.clone(), dir: x.dir.clone(), nodes: x.nodes.iter().map(|y| *mapper.get(y).unwrap() as u32).collect()}).collect();
+        self.wrapper = Some(mapper)
 
     }
+
+
+
+
 
 
 
@@ -643,6 +751,7 @@ impl <'a> NCGraphWrapper<'a>{
             path2genome: HashMap::new(),
         }
     }
+    
 
 
 
