@@ -3,8 +3,6 @@ use std::fs::File;
 use std::io::{prelude::*, BufReader};
 use std::io::{BufWriter, Write};
 use std::path::Path as file_path;
-use std::process::id;
-use std::ptr::read;
 use flate2::read::GzDecoder;
 
 
@@ -32,13 +30,13 @@ impl Header {
 
 #[derive(Debug, PartialEq, Clone)]
 /// Optional fields for GFA 1/2
-pub struct opt_elem{
+pub struct OptElem {
     pub key: String,
     pub typ: String,
     pub val: String,
 }
 
-impl opt_elem{
+impl OptElem {
 
     /// Write optional field to string
     fn to_string1(&self) -> String{
@@ -52,7 +50,7 @@ pub trait OptFields: Sized + Default + Clone {
 
     /// Return a slice over all optional fields. NB: This may be
     /// replaced by an iterator or something else in the future
-    fn fields(&self) -> &[opt_elem];
+    fn fields(&self) -> &[OptElem];
 
     /// Given an iterator over bytestrings, each expected to hold one
     /// optional field (in the <TAG>:<TYPE>:<VALUE> format), parse
@@ -69,7 +67,7 @@ pub trait OptFields: Sized + Default + Clone {
 /// methods are no-ops.
 impl OptFields for () {
 
-    fn fields(&self) -> &[opt_elem] {
+    fn fields(&self) -> &[OptElem] {
         &[]
     }
 
@@ -83,9 +81,9 @@ impl OptFields for () {
 /// uses std::iter::Iterator::find(), but as there are only a
 /// relatively small number of optional fields in practice, it should
 /// be efficient enough.
-impl OptFields for Vec<opt_elem> {
+impl OptFields for Vec<OptElem> {
 
-    fn fields(&self) -> &[opt_elem] {
+    fn fields(&self) -> &[OptElem] {
         self.as_slice()
     }
 
@@ -96,7 +94,7 @@ impl OptFields for Vec<opt_elem> {
             let tag = parts.next().unwrap();
             let typ = parts.next().unwrap();
             let val = parts.next().unwrap();
-            fields.push(opt_elem{key: tag.to_string(), typ: typ.to_string(), val: val.to_string()});
+            fields.push(OptElem {key: tag.to_string(), typ: typ.to_string(), val: val.to_string()});
         }
         fields
     }
@@ -111,8 +109,7 @@ impl OptFields for Vec<opt_elem> {
 /// - Optional elements
 ///
 /// Comment:
-/// Sequence is stored as String which is (in most cases) very memory heavy. Future changed might
-/// involve just storing [u8]
+/// Sequence is stored as String which is (in most cases) very memory heavy.
 pub struct Node<T: OptFields>{
     pub id: String,
     pub seq: String,
@@ -124,7 +121,6 @@ impl <T: OptFields>Node<T> {
     /// Write node to string
     fn to_string(&self) -> String {
         let a = format!("S\t{}\t{}\n", self.id, self.seq.len());
-        let b: Vec<String> = self.opt.fields().iter().map(|a| a.to_string1()).collect();
 
         if self.opt.fields().len() > 0 {
             let b: Vec<String> = self.opt.fields().iter().map(|a| a.to_string1()).collect();
@@ -137,6 +133,7 @@ impl <T: OptFields>Node<T> {
 
     /// Write node to fasta
     fn to_fasta(&self) -> String {
+
         format!(">{}\n{}", self.id, self.seq)
     }
 }
@@ -160,7 +157,7 @@ pub struct Edge{
     pub to_dir: bool,
     pub pos : usize, // Position of the overlap
     pub overlap: String,
-    pub opt: Vec<opt_elem>,
+    pub opt: Vec<OptElem>,
     pub type_: EdgeType,
 }
 
@@ -234,6 +231,7 @@ pub struct Gfa<T: OptFields>{
     pub edges: Vec<Edge>,
     pub header: Header,
 }
+
 
 
 impl <T: OptFields>Gfa <T>{
@@ -337,7 +335,6 @@ impl <T: OptFields>Gfa <T>{
 
 
                     if line_split.len() > 3 {
-                        let mut opt2: Vec<opt_elem> = Vec::new();
                         let f = OptFields::parse(line_split);
                         nodes.push((id.clone(), Node { id: id, seq: seq, opt: f }));
 
@@ -358,7 +355,7 @@ impl <T: OptFields>Gfa <T>{
                     edge.type_ = EdgeType::Link;
                     if line_split.len() > 6 {
                         for x in line_split.iter().skip(6){
-                            let mut opt: opt_elem = opt_elem{ key: "".to_string(), typ: "".to_string(), val: "".to_string() };
+                            let mut opt: OptElem = OptElem { key: "".to_string(), typ: "".to_string(), val: "".to_string() };
                             let opt_split: Vec<&str> = x.split(":").collect();
                             opt.key = opt_split[0].to_string();
                             opt.typ = opt_split[1].to_string();
@@ -379,7 +376,7 @@ impl <T: OptFields>Gfa <T>{
                     edge.pos = ll;
                     if line_split.len() > 7 {
                         for x in line_split.iter().skip(7){
-                            let mut opt: opt_elem = opt_elem{ key: "".to_string(), typ: "".to_string(), val: "".to_string() };
+                            let mut opt: OptElem = OptElem { key: "".to_string(), typ: "".to_string(), val: "".to_string() };
                             let opt_split: Vec<&str> = x.split(":").collect();
                             opt.key = opt_split[0].to_string();
                             opt.typ = opt_split[1].to_string();
@@ -394,7 +391,7 @@ impl <T: OptFields>Gfa <T>{
                     let name: String = String::from(line_split[1]);
                     let dirs: Vec<bool> = line_split[2].split(",").map(|d| if &d[d.len() - 1..] == "+" { !false } else { !true }).collect();
                     let node_id: Vec<String> = line_split[2].split(",").map(|d| d[..d.len() - 1].parse().unwrap()).collect();
-                    let mut overlap = Vec::new();
+                    let overlap;
                     if line_split.len() > 3{
                         overlap = line_split[3].split(",").map(|d| d.parse().unwrap()).collect();
                     } else {
@@ -419,7 +416,7 @@ impl <T: OptFields>Gfa <T>{
         let f = File::create(file_name).expect("Unable to create file");
         let mut f = BufWriter::new(f);
 
-        write!(f, "{}\n",  self.header.to_string1());
+        write!(f, "{}\n",  self.header.to_string1()).expect("Not able to write");
         for node in self.nodes.iter() {
             write!(f, "{}\n", node.1.to_string()).expect("Not able to write");
         }
@@ -536,7 +533,7 @@ pub struct NNode {
 
 impl NNode {
     pub fn to_string(&self, mapper: &Option<Vec<&String>>) -> String {
-        let mut a = "".to_string();
+        let a;
         if Some(mapper) != None{
             a = format!("S\t{}\t{}\n", self.id, self.seq.len());
         } else {
@@ -564,7 +561,7 @@ pub struct NEdge {
 
 impl NEdge {
     pub fn to_string(&self, mapper: &Option<Vec<String>>) -> String{
-        let mut a = "".to_string();
+        let a ;
         if Some(mapper) != None{
             a = format!("L\t{}\t{}\t{}\t{}\n", mapper.as_ref().unwrap()[self.from as usize].clone(), {if self.from_dir{"+"} else {"-"}}, mapper.as_ref().unwrap()[self.to as usize].clone(), {if self.to_dir{"+"} else {"-"}});
         } else {
@@ -590,7 +587,7 @@ pub struct NPath {
 impl NPath{
     pub fn to_string(&self, mapper: &Option<Vec<&String>>) -> String{
         let a = format!("P\t{}\t", self.name);
-        let mut vec: Vec<String> = Vec::new();
+        let vec: Vec<String>;
         if Some(mapper) != None{
             vec = self.nodes.iter().zip(&self.dir).map(|n| format!("{}{}", mapper.as_ref().unwrap()[*n.0 as usize], {if *n.1{"+".to_string()} else {"-".to_string()}})).collect();
 
@@ -690,26 +687,21 @@ impl NCGfa {
 
     /// Parse GFA file
     pub fn parse_gfa_file(&mut self, filename: &str) {
-        //let mut nodes = vec![];
-        let mut nodes: Vec<u32> = Vec::new();
-        //let mut paths = Vec::new();
         if file_path::new(filename).exists() {
             let mut file = File::open(filename).expect("ERROR: CAN NOT READ FILE\n");
             let mut contents = String::new();
             file.read_to_string(&mut contents).unwrap();
 
             // path name -> path_number
-            let mut count = 0;
             let mut nodes = Vec::new();
 
             for line in contents.lines() {
                 let line_split: Vec<&str> = line.split("\t").collect();
                 match line_split[0] {
-                    "S" => {let mut id = line_split[1].parse().unwrap();
+                    "S" => {let id = line_split[1].parse().unwrap();
                         nodes.push(NNode { id: id, seq: line_split[2].to_string()});}
                     "P" =>{
                         let name: String = String::from(line_split[1]);
-                        count += 1;
                         let c = line_split[2].split(",");
                         let mut dirs: Vec<bool> = c.clone().map(|d| &d[d.len() - 1..] == "+" ).collect();
                         let mut nodd: Vec<u32> = c.map(|d| d[..d.len() - 1].parse().unwrap()).collect();
@@ -793,6 +785,40 @@ impl <'a> NCGraphWrapper<'a>{
     }
 }
 
+
+
+// parse gfa file and check if the nodes are numeric
+pub fn read_nodes(filename: &str) -> bool{
+    if file_path::new(filename).exists() {
+        let mut file = File::open(filename).expect("ERROR: CAN NOT READ FILE\n");
+        let mut contents = String::new();
+        file.read_to_string(&mut contents).unwrap();
+
+        // path name -> path_number
+        let mut nodes = Vec::new();
+
+        for line in contents.lines() {
+            let line_split: Vec<&str> = line.split("\t").collect();
+            match line_split[0] {
+                "S" => {
+                    nodes.push(line_split[1]);
+                }
+                _ => ()
+            }
+        }
+        let aa = nodes.iter().map(|x| x.chars().map(|g| g.is_ascii_digit()).collect::<Vec<bool>>().contains(&false)).collect::<Vec<bool>>().contains(&false);
+        if aa {
+            let mut numeric_nodes = nodes.iter().map(|x| x.parse::<usize>().unwrap()).collect::<Vec<usize>>();
+            numeric_nodes.sort();
+
+
+            let f = numeric_nodes.windows(2).all(|pair| pair[1] == pair[0] + 1);
+            return f
+        }
+        return true
+    }
+    return false
+}
 
 
 
