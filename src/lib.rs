@@ -29,7 +29,7 @@ impl Header {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-/// Optional fields for GFA 1/2
+/// Optional fields for GFA 1
 pub struct OptElem {
     pub key: String,
     pub typ: String,
@@ -88,6 +88,9 @@ impl OptFields for Vec<OptElem> {
     }
 
     fn parse(input: Vec<&str>) -> Self{
+        if input.len() < 4 {
+            return Vec::new();
+        }
         let mut fields = Vec::new();
         for field in input {
             let mut parts = field.split(':');
@@ -104,12 +107,9 @@ impl OptFields for Vec<OptElem> {
 
 #[derive(Debug)]
 /// Graph nodes:
-/// - identifier
-/// - sequence
+/// - Identifier
+/// - Sequence
 /// - Optional elements
-///
-/// Comment:
-/// Sequence is stored as String which is (in most cases) very memory heavy.
 pub struct Node<T: OptFields>{
     pub id: String,
     pub seq: String,
@@ -140,10 +140,10 @@ impl <T: OptFields>Node<T> {
 
 #[derive(Debug, PartialEq)]
 /// Graph edges
-/// - from
-/// - from direction
-/// - to
-/// - to direction
+/// - From
+/// - From direction
+/// - To
+/// - To direction
 /// - Overlap (Link + containment)
 /// - Pos
 /// - Ops
@@ -192,6 +192,9 @@ impl Edge {
 /// - names
 /// - Directions of the nodes
 /// - Node names
+/// - Overlap
+///
+/// Comment: When there is not that many paths, the amount of memory for the overlap is not that much.
 pub struct Path{
     pub name: String,
     pub dir: Vec<bool>,
@@ -217,13 +220,14 @@ impl Path {
 
 
 #[derive(Debug)]
-/// The graph contains of nodes, path and edges.
-/// This is a simple implementation where identifiers of nodes can be of any kind. I highly recommend using integers, but in the format description it is not required.
-/// Most of the above structures are very simple and do not contain any flags/overlap information.
-/// More might come later
+/// The gfa contains
+/// - header
+/// - nodes
+/// - paths
+/// - edges
 ///
 /// Comment: This implementation should be able to parse any kind of GFAv1, but has increased
-/// memory consumption, since many parts are stored at Strings which are a minimum of 24 bytes.
+/// memory consumption, since most node ids are stored at Strings which are a minimum of 24 bytes.
 /// This is only maintained, since it is not of further use in any of my projects.
 pub struct Gfa<T: OptFields>{
     pub nodes: HashMap<String, Node<T>>,
@@ -259,40 +263,39 @@ impl <T: OptFields>Gfa <T>{
     }
 
     /// Check if the nodes in the graph are
-    /// -nodes are present
-    /// -numeric
-    /// -compact
-    /// -start at X
-    pub fn check_nc(&mut self) -> (Option<Vec<usize>>, Option<usize>){
+    /// - Nodes are present
+    /// - Numeric
+    /// - Compact
+    /// - Start at 1
+    ///
+    /// Returns:
+    ///     - Option<Vec<usize>>: Nodes ids in usize (from String)
+    ///     - Option<usize>: The minimum node id
+    pub fn check_nc(&mut self) -> Option<Vec<usize>>{
 
-        // If the graph is empty
+        // If the graph has no nodes -> returns false
         if self.nodes.len() == 0 {
-            return (None, None)
+            return None
         }
 
 
         // Check if the graph is numeric
         let nodes = self.nodes.iter().map(|x| x.1.id.clone()).collect::<Vec<String>>();
-        let aa = nodes.iter().map(|x| x.chars().map(|g| g.is_ascii_digit()).collect::<Vec<bool>>().contains(&false)).collect::<Vec<bool>>().contains(&false);
+        let is_digit = nodes.iter().map(|x| x.chars().map(|g| g.is_ascii_digit()).collect::<Vec<bool>>().contains(&false)).collect::<Vec<bool>>().contains(&false);
 
         // Check if the numeric nodes are compact
-        if aa {
+        if is_digit {
             let mut numeric_nodes = nodes.iter().map(|x| x.parse::<usize>().unwrap()).collect::<Vec<usize>>();
             numeric_nodes.sort();
-
-
             let f = numeric_nodes.windows(2).all(|pair| pair[1] == pair[0] + 1);
-            let mm = numeric_nodes.iter().cloned().min();
-            if (mm.unwrap()  as f64/ numeric_nodes.len() as f64) < 0.2 && f{
-                return (Some(numeric_nodes), mm)
-            }
-            else {
-                return (None, None)
-            }
-        } else {
-            return (None, None)
-        }
 
+            // Check the min
+            let mm = numeric_nodes.iter().cloned().min().unwrap();
+            if mm == 1 {
+                return Some(numeric_nodes)
+            }
+        }
+            return None
 
 
     }
@@ -315,11 +318,13 @@ impl <T: OptFields>Gfa <T>{
         if file_path::new(file_name).exists() {
             let file = File::open(file_name).expect("ERROR: CAN NOT READ FILE\n");
 
+            // Parse plain text or gzipped file
             let reader: Box<dyn BufRead> = if file_name.ends_with(".gz") {
                 Box::new(BufReader::new(GzDecoder::new(file)))
             } else {
                 Box::new(BufReader::new(file))
             };
+
 
             let mut nodes: Vec<(String, Node<T>)> = Vec::new();
 
@@ -327,81 +332,74 @@ impl <T: OptFields>Gfa <T>{
             for line in reader.lines() {
                 let l = line.unwrap();
                 let line_split: Vec<&str> = l.split("\t").collect();
-
-                // If line is segment
-                if line_split[0] == "S" {
-                    let seq = line_split[2].to_string();
-                    let id  = line_split[1].to_string();
-
-
-                    if line_split.len() > 3 {
-                        let f = OptFields::parse(line_split);
+                match line_split[0] {
+                    "S" => {
+                        let seq = line_split[2].to_string();
+                        let id  = line_split[1].to_string();
+                        let f = T::parse(line_split);
                         nodes.push((id.clone(), Node { id: id, seq: seq, opt: f }));
-
-                    }
-                    else {
-                        let f = OptFields::parse(line_split);
-                        nodes.push((id.clone(), Node { id: id, seq: seq, opt: f }));
-
-                    }
-
-                } else if l.starts_with("L") {
-                    let mut edge = Edge { from: "".to_string(), to: "".to_string(), from_dir: false, to_dir: false, overlap: "0".to_string(), opt: Vec::new(), type_: EdgeType::Link, pos: 0};
-                    edge.from = line_split[1].parse().unwrap();
-                    edge.to = line_split[3].parse().unwrap();
-                    edge.to_dir = if line_split[4] == "+" { !false } else { !true };
-                    edge.from_dir = if line_split[2] == "+" { !false } else { !true };
-                    edge.overlap = line_split[5].parse().unwrap();
-                    edge.type_ = EdgeType::Link;
-                    if line_split.len() > 6 {
-                        for x in line_split.iter().skip(6){
-                            let mut opt: OptElem = OptElem { key: "".to_string(), typ: "".to_string(), val: "".to_string() };
-                            let opt_split: Vec<&str> = x.split(":").collect();
-                            opt.key = opt_split[0].to_string();
-                            opt.typ = opt_split[1].to_string();
-                            opt.val = opt_split[2].to_string();
-                            edge.opt.push(opt);
+                    },
+                    "P" => {
+                        let name: String = String::from(line_split[1]);
+                        let dirs: Vec<bool> = line_split[2].split(",").map(|d| if &d[d.len() - 1..] == "+" { !false } else { !true }).collect();
+                        let node_id: Vec<String> = line_split[2].split(",").map(|d| d[..d.len() - 1].parse().unwrap()).collect();
+                        let overlap;
+                        if line_split.len() > 3{
+                            overlap = line_split[3].split(",").map(|d| d.parse().unwrap()).collect();
+                        } else {
+                            overlap  = vec!["*".to_string(); node_id.len()];
                         }
-                    }
-                    self.edges.push(edge);
-                } else if l.starts_with("C ") {
-                    let ll: usize = line_split[5].parse().unwrap();
-                    let mut edge = Edge { from: "".to_string(), to: "".to_string(), from_dir: false, to_dir: false, overlap: "0".to_string(), opt: Vec::new(), type_: EdgeType::Link, pos: 0};
-                    edge.from = line_split[1].parse().unwrap();
-                    edge.to = line_split[3].parse().unwrap();
-                    edge.to_dir = if line_split[4] == "+" { !false } else { !true };
-                    edge.from_dir = if line_split[2] == "+" { !false } else { !true };
-                    edge.overlap = line_split[5].parse().unwrap();
-                    edge.type_ = EdgeType::Containment;
-                    edge.pos = ll;
-                    if line_split.len() > 7 {
-                        for x in line_split.iter().skip(7){
-                            let mut opt: OptElem = OptElem { key: "".to_string(), typ: "".to_string(), val: "".to_string() };
-                            let opt_split: Vec<&str> = x.split(":").collect();
-                            opt.key = opt_split[0].to_string();
-                            opt.typ = opt_split[1].to_string();
-                            opt.val = opt_split[2].to_string();
-                            edge.opt.push(opt);
+                        self.paths.push(Path { name: name, dir: dirs, nodes: node_id, overlap: overlap})
+
+
+                    },
+                    "L" => {
+                        let mut edge = Edge { from: "".to_string(), to: "".to_string(), from_dir: false, to_dir: false, overlap: "0".to_string(), opt: Vec::new(), type_: EdgeType::Link, pos: 0};
+                        edge.from = line_split[1].parse().unwrap();
+                        edge.to = line_split[3].parse().unwrap();
+                        edge.to_dir = if line_split[4] == "+" { !false } else { !true };
+                        edge.from_dir = if line_split[2] == "+" { !false } else { !true };
+                        edge.overlap = line_split[5].parse().unwrap();
+                        edge.type_ = EdgeType::Link;
+                        if line_split.len() > 6 {
+                            for x in line_split.iter().skip(6){
+                                let mut opt: OptElem = OptElem { key: "".to_string(), typ: "".to_string(), val: "".to_string() };
+                                let opt_split: Vec<&str> = x.split(":").collect();
+                                opt.key = opt_split[0].to_string();
+                                opt.typ = opt_split[1].to_string();
+                                opt.val = opt_split[2].to_string();
+                                edge.opt.push(opt);
+                            }
                         }
+                        self.edges.push(edge);
                     }
-                    self.edges.push(edge);
-
-
-                } else if l.starts_with("P") {
-                    let name: String = String::from(line_split[1]);
-                    let dirs: Vec<bool> = line_split[2].split(",").map(|d| if &d[d.len() - 1..] == "+" { !false } else { !true }).collect();
-                    let node_id: Vec<String> = line_split[2].split(",").map(|d| d[..d.len() - 1].parse().unwrap()).collect();
-                    let overlap;
-                    if line_split.len() > 3{
-                        overlap = line_split[3].split(",").map(|d| d.parse().unwrap()).collect();
-                    } else {
-                        overlap  = vec!["*".to_string(); node_id.len()];
+                    "C" => {
+                        let ll: usize = line_split[5].parse().unwrap();
+                        let mut edge = Edge { from: "".to_string(), to: "".to_string(), from_dir: false, to_dir: false, overlap: "0".to_string(), opt: Vec::new(), type_: EdgeType::Link, pos: 0};
+                        edge.from = line_split[1].parse().unwrap();
+                        edge.to = line_split[3].parse().unwrap();
+                        edge.to_dir = if line_split[4] == "+" { !false } else { !true };
+                        edge.from_dir = if line_split[2] == "+" { !false } else { !true };
+                        edge.overlap = line_split[5].parse().unwrap();
+                        edge.type_ = EdgeType::Containment;
+                        edge.pos = ll;
+                        if line_split.len() > 7 {
+                            for x in line_split.iter().skip(7){
+                                let mut opt: OptElem = OptElem { key: "".to_string(), typ: "".to_string(), val: "".to_string() };
+                                let opt_split: Vec<&str> = x.split(":").collect();
+                                opt.key = opt_split[0].to_string();
+                                opt.typ = opt_split[1].to_string();
+                                opt.val = opt_split[2].to_string();
+                                edge.opt.push(opt);
+                            }
+                        }
+                        self.edges.push(edge);
                     }
-                    self.paths.push(Path { name: name, dir: dirs, nodes: node_id, overlap: overlap})
-
-
-                } else if l.starts_with("H") {
-                    self.header = Header { version_number: String::from(line_split[1]) };
+                    "H" => {
+                        self.header = Header { version_number: String::from(line_split[1]) };
+                    }
+                    _ => {
+                    }
                 }
 
             }
@@ -500,11 +498,11 @@ impl <'a> GraphWrapper<'a>{
 
 
 #[derive(Debug, Clone)]
-/// The graph contains of nodes, path and edges. NGfa = **N**umbericGfa
-/// This is a simple implementation where identifiers of nodes required to be unsiged interges (0
-/// or bigger). Most of the structures are very simple and do not contain any flags/overlap
-/// information.
-/// More might come later
+/// The graph contains of nodes, path and edges. NCGfa = NumericCompactGfa
+/// This is a compact graph representation of the GFA file.
+///
+/// The goal:
+/// - Direct implementation of map
 ///
 /// Comment: Implementation here are much faster and do include some derivates of parser and data
 /// structures that are not parsing the whole file and/or are faster with the downside of more
@@ -513,7 +511,7 @@ pub struct NCGfa{
     pub nodes: Vec<NNode>,
     pub paths: Vec<NPath>,
     pub edges: Vec<NEdge>,
-    pub wrapper: Option<HashMap<String, usize>>,
+    pub mapper: Option<HashMap<String, usize>>,
 }
 
 
@@ -523,8 +521,7 @@ pub struct NCGfa{
 /// - sequence
 ///
 /// Comment:
-/// Sequence is stored as String which is (in most cases) very memory heavy. Future changed might
-/// involve just storing [u8].
+/// Add opt after
 pub struct NNode {
     pub id: u32,
     pub seq: String,
@@ -532,6 +529,13 @@ pub struct NNode {
 
 
 impl NNode {
+    pub fn new()-> Self{
+        Self{
+            id: 0,
+            seq: String::new(),
+        }
+    }
+
     pub fn to_string(&self, mapper: &Option<Vec<&String>>) -> String {
         let a;
         if Some(mapper) != None{
@@ -614,16 +618,45 @@ impl NCGfa {
     ///
     /// ```
     pub fn new() -> Self {
-        let nodes: Vec<NNode> = Vec::new();
-        let paths: Vec<NPath> = Vec::new();
-        let edges: Vec<NEdge> = Vec::new();
 
         Self {
-            nodes: nodes,
-            paths: paths,
-            edges: edges,
-            wrapper: None,
+            nodes: Vec::new(),
+            paths: Vec::new(),
+            edges: Vec::new(),
+            mapper: None,
         }
+    }
+
+    /// Mapper<&String, usize> -> Vec<&String>
+    ///
+    /// Reverse the mapper to vector
+    pub fn reverse_mapper(&self) -> Vec<String>{
+
+        // When mapper ->
+        let mut usize2id = vec!["".to_string(); self.nodes.len()+1];
+
+        if self.mapper.is_some(){
+            for x in self.mapper.as_ref().unwrap().iter(){
+                usize2id[*x.1] = x.0.to_string();
+            }
+        } else {
+            usize2id = self.nodes.iter().map(|x| x.id.to_string()).collect();
+            usize2id.insert(0, "".to_string());
+            }
+
+
+        usize2id
+    }
+
+    /// Get the nnode from the real node_id
+    pub fn get_real_node(&self, node_id: &String) -> bool{
+        if Some(self.mapper.as_ref().unwrap()) != None {
+            let st = self.mapper.as_ref().unwrap().get(node_id).unwrap();
+            let node = &self.nodes[*st].clone();
+        } else {
+            let node = &self.nodes[node_id.parse::<usize>().unwrap()];
+        }
+        false
     }
 
     /// NGraph constructor when feature sizes are known
@@ -640,15 +673,16 @@ impl NCGfa {
             nodes: Vec::with_capacity(nodes_number),
             paths: Vec::with_capacity(paths_number),
             edges: Vec::with_capacity(edge_number),
-            wrapper: None,
+            mapper: None,
         }
     }
 
 
+    /// Convert normal gfa to NCGFA
     pub fn from_gfa<T: OptFields>(&mut self, graph: &mut Gfa<T>) {
         let a = graph.check_nc();
-        if a.0 != None{
-            let mut nodes: Vec<NNode> = Vec::with_capacity(a.0.unwrap().len() + a.1.unwrap());
+        if a != None{
+            let mut nodes: Vec<NNode> = Vec::with_capacity(a.unwrap().len());
             graph.nodes.iter().for_each(|x| nodes[x.1.id.parse::<usize>().unwrap()] = NNode{id: x.1.id.parse::<u32>().unwrap(), seq: x.1.seq.clone()});
             self.edges = graph.edges.iter().map(|x| NEdge{from: x.from.parse().unwrap(), from_dir: x.from_dir, to: x.to.parse().unwrap(), to_dir: x.to_dir}).collect();
             self.paths = graph.paths.iter().map(|x| NPath{name: x.name.clone(), dir: x.dir.clone(), nodes: x.nodes.iter().map(|y| y.parse().unwrap()).collect()}).collect();
@@ -658,22 +692,23 @@ impl NCGfa {
         }
     }
 
+    /// Create mapper from old node id to new id
     pub fn make_mapper<T: OptFields>(&mut self, graph: &mut Gfa<T>) -> HashMap<String, usize> {
         let mut f = graph.nodes.iter().map(|x| x.1.id.clone()).collect::<Vec<String>>();
         f.sort_by_key(|digit| digit.parse::<u32>().unwrap());
         let mut wrapper = HashMap::new();
         for (i, node) in f.iter().enumerate() {
-            wrapper.insert(node.clone(), i);
+            wrapper.insert(node.clone(), i+1);
         }
         wrapper
     }
 
+    /// Convert the "old" graph with the mapper
     pub fn convert_with_mapper<T: OptFields>(&mut self, mapper: HashMap<String, usize>, graph: &Gfa<T>){
-
         self.nodes = graph.nodes.iter().map(|x| NNode{id: *mapper.get(&x.1.id).unwrap() as u32, seq: x.1.seq.clone()}).collect();
         self.edges = graph.edges.iter().map(|x| NEdge{from: *mapper.get(&x.from).unwrap() as u32, from_dir: x.from_dir, to: *mapper.get(&x.to).unwrap() as u32, to_dir: x.to_dir}).collect();
         self.paths = graph.paths.iter().map(|x| NPath{name: x.name.clone(), dir: x.dir.clone(), nodes: x.nodes.iter().map(|y| *mapper.get(y).unwrap() as u32).collect()}).collect();
-        self.wrapper = Some(mapper)
+        self.mapper = Some(mapper)
 
     }
 
@@ -686,19 +721,20 @@ impl NCGfa {
 
 
     /// Parse GFA file
-    pub fn parse_gfa_file(&mut self, filename: &str) {
+    pub fn parse_gfa_file(&mut self, filename: &str) -> bool{
         if file_path::new(filename).exists() {
             let mut file = File::open(filename).expect("ERROR: CAN NOT READ FILE\n");
             let mut contents = String::new();
             file.read_to_string(&mut contents).unwrap();
 
-            // path name -> path_number
+            // Temp nodes
             let mut nodes = Vec::new();
 
             for line in contents.lines() {
                 let line_split: Vec<&str> = line.split("\t").collect();
                 match line_split[0] {
-                    "S" => {let id = line_split[1].parse().unwrap();
+                    "S" => {
+                        let id = line_split[1].parse().unwrap();
                         nodes.push(NNode { id: id, seq: line_split[2].to_string()});}
                     "P" =>{
                         let name: String = String::from(line_split[1]);
@@ -716,12 +752,19 @@ impl NCGfa {
                     _ => ()
                 }
             }
+            // Sort the keys
             nodes.sort_by_key(|a| a.id);
-            self.nodes = nodes;
+            let nodes_id_max = nodes[nodes.len()-1].id;
+            let mut new_nodes = vec![NNode::new(); nodes_id_max as usize + 1];
+
+            nodes.into_iter().for_each(|x| new_nodes[x.id as usize] = x.clone());
+            self.nodes = new_nodes;
             self.nodes.shrink_to_fit();
             self.edges.shrink_to_fit();
             self.paths.shrink_to_fit();
+
         }
+        false
     }
 }
 
@@ -787,7 +830,7 @@ impl <'a> NCGraphWrapper<'a>{
 
 
 
-// parse gfa file and check if the nodes are numeric
+/// Check a file if the nodes are numeric and compact
 pub fn read_nodes(filename: &str) -> bool{
     if file_path::new(filename).exists() {
         let mut file = File::open(filename).expect("ERROR: CAN NOT READ FILE\n");
@@ -806,14 +849,13 @@ pub fn read_nodes(filename: &str) -> bool{
                 _ => ()
             }
         }
-        let aa = nodes.iter().map(|x| x.chars().map(|g| g.is_ascii_digit()).collect::<Vec<bool>>().contains(&false)).collect::<Vec<bool>>().contains(&false);
-        if aa {
+        let is_digit = nodes.iter().map(|x| x.chars().map(|g| g.is_ascii_digit()).collect::<Vec<bool>>().contains(&false)).collect::<Vec<bool>>().contains(&false);
+        if is_digit {
             let mut numeric_nodes = nodes.iter().map(|x| x.parse::<usize>().unwrap()).collect::<Vec<usize>>();
             numeric_nodes.sort();
+            let compact = numeric_nodes.windows(2).all(|pair| pair[1] == pair[0] + 1);
 
-
-            let f = numeric_nodes.windows(2).all(|pair| pair[1] == pair[0] + 1);
-            return f
+            return compact
         }
         return true
     }

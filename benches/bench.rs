@@ -14,13 +14,15 @@ fn gfa_normal(filename: &str){
 /// Read a NC graph
 fn ngfa_normal(filename: &str){
     let mut _intervals = NCGfa::new();
-    _intervals.parse_gfa_file(filename)
+    let f = _intervals.parse_gfa_file(filename);
     //sort_vector(&mut intervals);
 }
 
 /// Read graph and check nodes
 fn test_nodes(filename: &str){
     let mut nodes = read_nodes(filename);
+    let mut _intervals = NCGfa::new();
+    let f = _intervals.parse_gfa_file(filename);
 }
 
 /// Read graph and convert to NC graph
