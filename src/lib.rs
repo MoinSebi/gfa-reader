@@ -4,6 +4,7 @@ use std::io::{prelude::*, BufReader};
 use std::io::{BufWriter, Write};
 use std::path::Path as file_path;
 use flate2::read::GzDecoder;
+use std::time::{Duration, Instant};
 
 
 #[derive(Debug)]
@@ -102,6 +103,51 @@ impl OptFields for Vec<OptElem> {
         fields
     }
 }
+
+
+pub trait OptSeq: Sized + Default + Clone {
+
+    /// Return a slice over all optional fields. NB: This may be
+    /// replaced by an iterator or something else in the future
+    fn fields(&self) -> &str;
+
+    /// Given an iterator over bytestrings, each expected to hold one
+    /// optional field (in the <TAG>:<TYPE>:<VALUE> format), parse
+    /// them as optional fields to create a collection. Returns `Self`
+    /// rather than `Option<Self>` for now, but this may be changed to
+    /// become fallible in the future.
+    fn parse(input: Vec<&str>) -> Self;
+
+
+}
+
+
+/// Having sequence or not
+impl OptSeq for () {
+
+    fn fields(&self) -> &str {
+        ""
+    }
+
+    fn parse(_input: Vec<&str>) -> Self
+    {
+    }
+
+}
+
+/// If you dont want to store
+impl OptSeq for String {
+
+    fn fields(&self) -> &str {
+        self.as_ref()
+    }
+
+    fn parse(input: Vec<&str>) -> Self{
+        let seq = input[3].to_string();
+        seq
+    }
+}
+
 
 
 
@@ -315,6 +361,9 @@ impl <T: OptFields>Gfa <T>{
     /// graph.parse_gfa_file("/path/to/graph");
     /// ´´´
     pub fn parse_gfa_file(&mut self, file_name: &str) {
+        let mut total_elapsed_time = Duration::new(0, 0);
+
+
         if file_path::new(file_name).exists() {
             let file = File::open(file_name).expect("ERROR: CAN NOT READ FILE\n");
 
@@ -334,12 +383,14 @@ impl <T: OptFields>Gfa <T>{
                 let line_split: Vec<&str> = l.split("\t").collect();
                 match line_split[0] {
                     "S" => {
-                        let seq = line_split[2].to_string();
-                        let id  = line_split[1].to_string();
-                        let f = T::parse(line_split);
-                        nodes.push((id.clone(), Node { id: id, seq: seq, opt: f }));
+
+
+                        nodes.push((line_split[1].to_string(), Node { id: line_split[1].to_string(), seq: line_split[2].to_string(), opt: T::parse(line_split) }));
+
+
                     },
                     "P" => {
+
                         let name: String = String::from(line_split[1]);
                         let dirs: Vec<bool> = line_split[2].split(",").map(|d| if &d[d.len() - 1..] == "+" { !false } else { !true }).collect();
                         let node_id: Vec<String> = line_split[2].split(",").map(|d| d[..d.len() - 1].parse().unwrap()).collect();
@@ -349,11 +400,13 @@ impl <T: OptFields>Gfa <T>{
                         } else {
                             overlap  = vec!["*".to_string(); node_id.len()];
                         }
-                        self.paths.push(Path { name: name, dir: dirs, nodes: node_id, overlap: overlap})
+                        self.paths.push(Path { name: name, dir: dirs, nodes: node_id, overlap: overlap});
+
 
 
                     },
                     "L" => {
+
                         let mut edge = Edge { from: "".to_string(), to: "".to_string(), from_dir: false, to_dir: false, overlap: "0".to_string(), opt: Vec::new(), type_: EdgeType::Link, pos: 0};
                         edge.from = line_split[1].parse().unwrap();
                         edge.to = line_split[3].parse().unwrap();
@@ -371,6 +424,8 @@ impl <T: OptFields>Gfa <T>{
                                 edge.opt.push(opt);
                             }
                         }
+
+
                         self.edges.push(edge);
                     }
                     "C" => {
@@ -407,6 +462,7 @@ impl <T: OptFields>Gfa <T>{
             self.nodes.extend(nodes.into_iter());
 
         }
+
     }
 
     /// Write the graph to a file
@@ -679,7 +735,7 @@ impl NCGfa {
 
 
     /// Convert normal gfa to NCGFA
-    pub fn from_gfa<T: OptFields>(&mut self, graph: &mut Gfa<T>) {
+    pub fn from_gfa_struct<T: OptFields>(&mut self, graph: &mut Gfa<T>) {
         let a = graph.check_nc();
         if a != None{
             let mut nodes: Vec<NNode> = Vec::with_capacity(a.unwrap().len());
@@ -830,7 +886,7 @@ impl <'a> NCGraphWrapper<'a>{
 
 
 
-/// Check a file if the nodes are numeric and compact
+/// Check if a file has compact and numeric nodes
 pub fn read_nodes(filename: &str) -> bool{
     if file_path::new(filename).exists() {
         let mut file = File::open(filename).expect("ERROR: CAN NOT READ FILE\n");
@@ -849,18 +905,33 @@ pub fn read_nodes(filename: &str) -> bool{
                 _ => ()
             }
         }
-        let is_digit = nodes.iter().map(|x| x.chars().map(|g| g.is_ascii_digit()).collect::<Vec<bool>>().contains(&false)).collect::<Vec<bool>>().contains(&false);
+        let is_digit = vec_is_digit(&nodes);
         if is_digit {
-            let mut numeric_nodes = nodes.iter().map(|x| x.parse::<usize>().unwrap()).collect::<Vec<usize>>();
-            numeric_nodes.sort();
-            let compact = numeric_nodes.windows(2).all(|pair| pair[1] == pair[0] + 1);
-
+            let numeric_nodes = create_sort_numeric(&nodes);
+            let compact = vec_is_compact(&numeric_nodes);
             return compact
         }
         return true
     }
     return false
 }
+
+pub fn vec_is_digit(nodes: &Vec<&str>) -> bool{
+
+    nodes.iter().map(|x| x.chars().map(|g| g.is_ascii_digit()).collect::<Vec<bool>>().contains(&false)).collect::<Vec<bool>>().contains(&false)
+}
+
+
+pub fn create_sort_numeric(nodes: &Vec<&str>) -> Vec<usize> {
+    let mut numeric_nodes = nodes.iter().map(|x| x.parse::<usize>().unwrap()).collect::<Vec<usize>>();
+    numeric_nodes.sort();
+    numeric_nodes
+}
+
+pub fn vec_is_compact(numeric_nodes: &Vec<usize>) -> bool{
+    numeric_nodes.windows(2).all(|pair| pair[1] == pair[0] + 1)
+}
+
 
 
 
