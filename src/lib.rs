@@ -278,7 +278,7 @@ impl Path {
 /// memory consumption, since most node ids are stored at Strings which are a minimum of 24 bytes.
 /// This is only maintained, since it is not of further use in any of my projects.
 pub struct Gfa<T: OptFields>{
-    pub nodes: HashMap<String, Node<T>>,
+    pub nodes: Vec<Node<T>>,
     pub paths: Vec<Path>,
     pub edges: Vec<Edge>,
     pub header: Header,
@@ -297,15 +297,11 @@ impl <T: OptFields>Gfa <T>{
     ///
     /// ```
     pub fn new() -> Self {
-        let nodes: HashMap<String, Node<T>> = HashMap::new();
-        let paths: Vec<Path> = Vec::new();
-        let edges: Vec<Edge> = Vec::new();
-        let header = Header{tag: "".to_string(), typ: "".to_string(), version_number: "".to_string()};
         Self {
-            nodes: nodes,
-            paths: paths,
-            edges: edges,
-            header: header
+            nodes: Vec::new(),
+            paths: Vec::new(),
+            edges: Vec::new(),
+            header: Header{tag: "".to_string(), typ: "".to_string(), version_number: "".to_string()}
 
         }
     }
@@ -328,12 +324,12 @@ impl <T: OptFields>Gfa <T>{
 
 
         // Check if the graph is numeric
-        let nodes = self.nodes.iter().map(|x| x.1.id.clone()).collect::<Vec<String>>();
-        let is_digit = nodes.iter().map(|x| x.chars().map(|g| g.is_ascii_digit()).collect::<Vec<bool>>().contains(&false)).collect::<Vec<bool>>().contains(&false);
+
+        let is_digit = self.nodes.iter().map(|x| x.id.chars().map(|g| g.is_ascii_digit()).collect::<Vec<bool>>().contains(&false)).collect::<Vec<bool>>().contains(&false);
 
         // Check if the numeric nodes are compact
         if is_digit {
-            let mut numeric_nodes = nodes.iter().map(|x| x.parse::<usize>().unwrap()).collect::<Vec<usize>>();
+            let mut numeric_nodes = self.nodes.iter().map(|x| x.id.parse::<usize>().unwrap()).collect::<Vec<usize>>();
             numeric_nodes.sort();
             let f = numeric_nodes.windows(2).all(|pair| pair[1] == pair[0] + 1);
 
@@ -363,7 +359,6 @@ impl <T: OptFields>Gfa <T>{
     /// graph.parse_gfa_file("/path/to/graph");
     /// ´´´
     pub fn parse_gfa_file(&mut self, file_name: &str) {
-        let mut total_elapsed_time = Duration::new(0, 0);
 
 
         if file_path::new(file_name).exists() {
@@ -377,7 +372,7 @@ impl <T: OptFields>Gfa <T>{
             };
 
 
-            let mut nodes: Vec<(String, Node<T>)> = Vec::new();
+            let mut nodes: Vec<Node<T>> = Vec::new();
 
             // Iterate over lines
             for line in reader.lines() {
@@ -387,7 +382,7 @@ impl <T: OptFields>Gfa <T>{
                     "S" => {
 
 
-                        nodes.push((line_split[1].to_string(), Node { id: line_split[1].to_string(), seq: line_split[2].to_string(), opt: T::parse(line_split) }));
+                        nodes.push(Node { id: line_split[1].to_string(), seq: line_split[2].to_string(), opt: T::parse(line_split) });
 
 
                     },
@@ -461,8 +456,8 @@ impl <T: OptFields>Gfa <T>{
                 }
 
             }
-            self.nodes = HashMap::with_capacity(nodes.len());
-            self.nodes.extend(nodes.into_iter());
+
+            self.nodes.extend(nodes);
 
         }
 
@@ -475,7 +470,7 @@ impl <T: OptFields>Gfa <T>{
 
         write!(f, "{}\n",  self.header.to_string1()).expect("Not able to write");
         for node in self.nodes.iter() {
-            write!(f, "{}\n", node.1.to_string()).expect("Not able to write");
+            write!(f, "{}\n", node.to_string()).expect("Not able to write");
         }
         for edge in self.edges.iter() {
             write!(f, "{}\n", edge.to_string_link()).expect("Not able to write");
@@ -742,7 +737,7 @@ impl NCGfa {
         let a = graph.check_nc();
         if a != None{
             let mut nodes: Vec<NNode> = Vec::with_capacity(a.unwrap().len());
-            graph.nodes.iter().for_each(|x| nodes[x.1.id.parse::<usize>().unwrap()] = NNode{id: x.1.id.parse::<u32>().unwrap(), seq: x.1.seq.clone()});
+            graph.nodes.iter().for_each(|x| nodes[x.id.parse::<usize>().unwrap()] = NNode{id: x.id.parse::<u32>().unwrap(), seq: x.seq.clone()});
             self.edges = graph.edges.iter().map(|x| NEdge{from: x.from.parse().unwrap(), from_dir: x.from_dir, to: x.to.parse().unwrap(), to_dir: x.to_dir}).collect();
             self.paths = graph.paths.iter().map(|x| NPath{name: x.name.clone(), dir: x.dir.clone(), nodes: x.nodes.iter().map(|y| y.parse().unwrap()).collect()}).collect();
         } else {
@@ -753,7 +748,7 @@ impl NCGfa {
 
     /// Create mapper from old node id to new id
     pub fn make_mapper<T: OptFields>(&mut self, graph: &mut Gfa<T>) -> HashMap<String, usize> {
-        let mut f = graph.nodes.iter().map(|x| x.1.id.clone()).collect::<Vec<String>>();
+        let mut f = graph.nodes.iter().map(|x| x.id.clone()).collect::<Vec<String>>();
         f.sort_by_key(|digit| digit.parse::<u32>().unwrap());
         let mut wrapper = HashMap::new();
         for (i, node) in f.iter().enumerate() {
@@ -764,7 +759,7 @@ impl NCGfa {
 
     /// Convert the "old" graph with the mapper
     pub fn convert_with_mapper<T: OptFields>(&mut self, mapper: HashMap<String, usize>, graph: &Gfa<T>){
-        self.nodes = graph.nodes.iter().map(|x| NNode{id: *mapper.get(&x.1.id).unwrap() as u32, seq: x.1.seq.clone()}).collect();
+        self.nodes = graph.nodes.iter().map(|x| NNode{id: *mapper.get(&x.id).unwrap() as u32, seq: x.seq.clone()}).collect();
         self.edges = graph.edges.iter().map(|x| NEdge{from: *mapper.get(&x.from).unwrap() as u32, from_dir: x.from_dir, to: *mapper.get(&x.to).unwrap() as u32, to_dir: x.to_dir}).collect();
         self.paths = graph.paths.iter().map(|x| NPath{name: x.name.clone(), dir: x.dir.clone(), nodes: x.nodes.iter().map(|y| *mapper.get(y).unwrap() as u32).collect()}).collect();
         self.mapper = Some(mapper)
