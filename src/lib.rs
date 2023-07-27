@@ -31,6 +31,12 @@ impl Header {
     }
 }
 
+
+
+
+
+
+
 #[derive(Debug, PartialEq, Clone)]
 /// Optional fields for GFA 1
 pub struct OptElem {
@@ -47,7 +53,7 @@ impl OptElem {
 }
 
 
-
+/// Trait for OptFields
 pub trait OptFields: Sized + Default + Clone {
 
     /// Return a slice over all optional fields. NB: This may be
@@ -161,14 +167,14 @@ impl <T: OptFields>IsEdges<T> for () {
 impl <T: OptFields> IsEdges <T> for Edge<T> {
 
     fn new() -> Self {
-        Edge{from: "".to_string(), from_dir: false, to: "".to_string(), to_dir: false, overlap: "".to_string(), opt: T::new(), type_: EdgeType::Link, pos: 0}
+        Edge{from: "".to_string(), from_dir: false, to: "".to_string(), to_dir: false, overlap: "".to_string(), opt: T::new()}
     }
     fn fields(&self) -> Option<&Edge<T>>{
         Some(self)
     }
 
     fn parse(input: Vec<&str>) -> Self{
-        Edge{from: "".to_string(), from_dir: false, to: "".to_string(), to_dir: false, overlap: "".to_string(), opt: T::new(), type_: EdgeType::Link, pos: 0}
+        Edge{from: "".to_string(), from_dir: false, to: "".to_string(), to_dir: false, overlap: "".to_string(), opt: T::new()}
     }
 
     fn to_string(&self) -> String {
@@ -223,8 +229,6 @@ impl OptSeq for String {
 }
 
 
-
-
 #[derive(Debug)]
 /// Graph nodes:
 /// - Identifier
@@ -235,6 +239,7 @@ pub struct Node<T: OptFields>{
     pub seq: String,
     pub opt: T,
 }
+
 
 impl <T: OptFields>Node<T> {
 
@@ -258,6 +263,46 @@ impl <T: OptFields>Node<T> {
     }
 }
 
+
+#[derive(Debug, PartialEq, Clone, Default)]
+/// Graph edges
+/// - From
+/// - From direction
+/// - To
+/// - To direction
+/// - Overlap (Link + containment)
+/// - Pos
+/// - Ops
+///
+/// Comment:
+/// Edges go forward (true) or backward (false) to/from a node.
+pub struct Containment<T: OptFields>{
+    pub from: String,
+    pub from_dir: bool,
+    pub to: String,
+    pub to_dir: bool,
+    pub pos : usize, // Position of the overlap
+    pub overlap: String,
+    pub opt: T,
+}
+
+impl <T: OptFields>Containment<T> {
+
+    /// Write edge to string
+    fn to_string_link(&self) -> String {
+        let a = format!("L\t{}\t{}\t{}\t{}\t{}\n", self.from, {if self.from_dir{"+"} else {"-"}}, self.to, {if self.to_dir{"+"} else {"-"}}, self.overlap);
+        if self.opt.fields().len() > 0 {
+            let b: Vec<String> = self.opt.fields().iter().map(|a| a.to_string1()).collect();
+            let c = b.join("\t");
+            format!("{}{}\n", a, c)
+        } else {
+            a
+        }
+    }
+}
+
+
+
 #[derive(Debug, PartialEq, Clone, Default)]
 /// Graph edges
 /// - From
@@ -275,20 +320,11 @@ pub struct Edge<T: OptFields>{
     pub from_dir: bool,
     pub to: String,
     pub to_dir: bool,
-    pub pos : usize, // Position of the overlap
     pub overlap: String,
     pub opt: T,
-    pub type_: EdgeType,
 }
 
-#[derive(Debug, PartialEq, Clone, Default)]
-/// Data type for edge type
-pub enum EdgeType {
-    #[default]
-    Link,
-    Containment,
-    Other
-}
+
 
 impl <T: OptFields>Edge<T> {
 
@@ -477,7 +513,7 @@ impl <T: OptFields, S: IsEdges<T>>Gfa <T, S>{
                     },
                     "L" => {
 
-                        let mut edge = Edge { from: "".to_string(), to: "".to_string(), from_dir: false, to_dir: false, overlap: "0".to_string(), opt: Vec::new(), type_: EdgeType::Link, pos: 0};
+                        let mut edge = Edge { from: "".to_string(), to: "".to_string(), from_dir: false, to_dir: false, overlap: "0".to_string(), opt: T::new()};
                         let a = S::parse(line_split);
                         if let Some(value) = a.fields(){
                             self.edges.push(a);
