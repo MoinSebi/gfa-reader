@@ -11,21 +11,23 @@ use std::time::{Duration, Instant};
 /// GFA header line
 /// This line begins with an 'H'
 pub struct Header {
+    pub tag: String,
+    pub typ: String,
     pub version_number: String,
 }
 
 impl Header {
     /// Write header to string
     fn to_string1(&self) -> String {
-        format!("H\t{}", self.version_number)
+        format!("H\tVN:Z:\t{}", self.version_number)
     }
 
-    /// Parse header from string
+    /// Parse header from string (H-line)
     fn from_string(line: &str) -> Header {
-        let mut line = line.split_whitespace();
-        line.next();
-        let version_number = line.next().unwrap().to_string();
-        Header { version_number }
+        let tag = line.split(':').nth(0).unwrap().to_string();
+        let typ = line.split(':').nth(1).unwrap().to_string();
+        let version_number = line.split(':').nth(2).unwrap().to_string();
+        Header {tag, typ, version_number }
     }
 }
 
@@ -298,7 +300,7 @@ impl <T: OptFields>Gfa <T>{
         let nodes: HashMap<String, Node<T>> = HashMap::new();
         let paths: Vec<Path> = Vec::new();
         let edges: Vec<Edge> = Vec::new();
-        let header = Header{ version_number: "VN:Z:1.0".to_string() };
+        let header = Header{tag: "".to_string(), typ: "".to_string(), version_number: "".to_string()};
         Self {
             nodes: nodes,
             paths: paths,
@@ -451,7 +453,8 @@ impl <T: OptFields>Gfa <T>{
                         self.edges.push(edge);
                     }
                     "H" => {
-                        self.header = Header { version_number: String::from(line_split[1]) };
+                        let header = Header::from_string(&l);
+                        self.header = header;
                     }
                     _ => {
                     }
@@ -916,12 +919,13 @@ pub fn read_nodes(filename: &str) -> bool{
     return false
 }
 
+/// Does this vector contain only digits
 pub fn vec_is_digit(nodes: &Vec<&str>) -> bool{
 
     nodes.iter().map(|x| x.chars().map(|g| g.is_ascii_digit()).collect::<Vec<bool>>().contains(&false)).collect::<Vec<bool>>().contains(&false)
 }
 
-
+/// Create a numeric vector from a vector of strings
 pub fn create_sort_numeric(nodes: &Vec<&str>) -> Vec<usize> {
     let mut numeric_nodes = nodes.iter().map(|x| x.parse::<usize>().unwrap()).collect::<Vec<usize>>();
     numeric_nodes.sort();
