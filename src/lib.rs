@@ -185,49 +185,6 @@ impl <T: OptFields> IsEdges <T> for Edge<T> {
 
 
 
-pub trait OptSeq: Sized + Default + Clone {
-
-    /// Return a slice over all optional fields. NB: This may be
-    /// replaced by an iterator or something else in the future
-    fn fields(&self) -> &str;
-
-    /// Given an iterator over bytestrings, each expected to hold one
-    /// optional field (in the <TAG>:<TYPE>:<VALUE> format), parse
-    /// them as optional fields to create a collection. Returns `Self`
-    /// rather than `Option<Self>` for now, but this may be changed to
-    /// become fallible in the future.
-    fn parse(input: Vec<&str>) -> Self;
-
-
-}
-
-
-/// Having sequence or not
-impl OptSeq for () {
-
-    fn fields(&self) -> &str {
-        ""
-    }
-
-    fn parse(_input: Vec<&str>) -> Self
-    {
-    }
-
-}
-
-/// If you dont want to store
-impl OptSeq for String {
-
-    fn fields(&self) -> &str {
-        self.as_ref()
-    }
-
-    fn parse(input: Vec<&str>) -> Self{
-        let seq = input[3].to_string();
-        seq
-    }
-}
-
 
 #[derive(Debug)]
 /// Graph nodes:
