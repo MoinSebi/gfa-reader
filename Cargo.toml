@@ -28,3 +28,7 @@ harness = false
 [[test]]
 name = "tests"
 path = "tests/lib1.rs"
+
+
+[profile.test]
+debug = true
