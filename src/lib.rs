@@ -172,6 +172,7 @@ impl <T: OptFields>Node<T> {
 
 pub trait IsEdges<T: OptFields>: Sized + Default + Clone{
     type ReturnType;
+    type NewType: IsEdges<T>;
     /// Return a slice over all optional fields. NB: This may be
     /// replaced by an iterator or something else in the future
     fn fields(&self) -> Option<&Self::ReturnType>;
@@ -187,6 +188,7 @@ pub trait IsEdges<T: OptFields>: Sized + Default + Clone{
 
     fn to_string(&self) -> String;
 
+    fn convert(&self) -> Self::NewType;
 
 
 }
@@ -197,6 +199,7 @@ pub trait IsEdges<T: OptFields>: Sized + Default + Clone{
 /// methods are no-ops.
 impl <T: OptFields>IsEdges<T> for () {
     type ReturnType = ();
+    type NewType = ();
 
     fn fields(&self) -> Option<&Self::ReturnType> {
         None
@@ -212,6 +215,10 @@ impl <T: OptFields>IsEdges<T> for () {
 
     fn to_string(&self) -> String {"".to_string()
     }
+
+    fn convert(&self) -> Self::NewType {
+        ()
+    }
 }
 
 /// Stores all the optional fields in a vector. `get_field` simply
@@ -220,6 +227,7 @@ impl <T: OptFields>IsEdges<T> for () {
 /// be efficient enough.
 impl <T: OptFields> IsEdges <T> for Edge<T> {
     type ReturnType = Edge<T>;
+    type NewType = NCEdge<T>;
     fn new() -> Self {
         Edge{from: "".to_string(), from_dir: false, to: "".to_string(), to_dir: false, overlap: "".to_string(), opt: T::new()}
     }
@@ -227,6 +235,7 @@ impl <T: OptFields> IsEdges <T> for Edge<T> {
         Some(self)
     }
 
+    #[inline]
     fn parse(line_split: Vec<&str>) -> Self{
         let mut edge = Edge { from: "".to_string(), to: "".to_string(), from_dir: false, to_dir: false, overlap: "0".to_string(), opt: T::new()};
         edge.from = line_split[1].parse().unwrap();
@@ -241,11 +250,17 @@ impl <T: OptFields> IsEdges <T> for Edge<T> {
     fn to_string(&self) -> String {
         self.to_string_link()
     }
+
+    fn convert(&self) -> Self::NewType {
+        NCEdge{from: self.from.parse().unwrap(), from_dir: self.from_dir, to: self.to.parse().unwrap(), to_dir: self.to_dir, overlap: self.overlap.clone(), opt: self.opt.clone()}
+    }
 }
 
 
 impl <T: OptFields> IsEdges <T> for NCEdge<T> {
     type ReturnType = NCEdge<T>;
+    type NewType = ();
+
     fn fields(&self) -> Option<&Self::ReturnType>{
         Some(self)
     }
@@ -266,6 +281,10 @@ impl <T: OptFields> IsEdges <T> for NCEdge<T> {
 
     fn to_string(&self) -> String {
         self.to_string_link()
+    }
+
+    fn convert(&self) -> Self::NewType {
+        ()
     }
 }
 
@@ -578,6 +597,14 @@ impl <T: OptFields, S: IsEdges<T>>Gfa <T, S>{
             write!(f, "{}\n", path.to_string()).expect("Not able to write");
         }
     }
+
+
+    pub fn convert_to_ncgraph(& self, graph: &Gfa<T, S>) -> NCGfa<T, S>{
+        let mut ncgraph: NCGfa<T, S> = NCGfa::new();
+        let f = ncgraph.make_mapper(graph);
+        ncgraph.convert_with_mapper(f, &graph);
+        ncgraph
+    }
 }
 
 
@@ -767,6 +794,16 @@ impl NCPath{
         format!("{}\t{}\n", a, f2)
 
     }
+
+
+    fn to_string2(&self) -> String {
+        let a = format!("P\t{}\t", self.name);
+        let f1: Vec<String> = self.nodes.iter().zip(&self.dir).map(|n| format!("{}{}", n.0, {if *n.1{"+".to_string()} else {"-".to_string()}})).collect();
+        let f2 = f1.join(",");
+        let f: Vec<String> = self.overlap.iter().map(|a| a.to_string()).collect();
+        let g = f.join(",");
+        format!("{}\t{}\t{}\n", a, f2, g)
+    }
 }
 
 impl isPath for NCPath{
@@ -882,7 +919,51 @@ impl  <T: OptFields, S: IsEdges<T>>NCGfa <T, S> {
         }
 
     }
+
+    /// Create mapper from old node id to new id
+    pub fn make_mapper(&mut self, graph: & Gfa<T, S>) -> HashMap<String, usize> {
+        let mut f = graph.nodes.iter().map(|x| x.id.clone()).collect::<Vec<String>>();
+        f.sort_by_key(|digit| digit.parse::<u32>().unwrap());
+        let mut wrapper = HashMap::new();
+        for (i, node) in f.iter().enumerate() {
+            wrapper.insert(node.clone(), i+1);
+        }
+        wrapper
+    }
+
+    /// Convert the "old" graph with the mapper
+    pub fn convert_with_mapper(&mut self, mapper: HashMap<String, usize>, graph: &Gfa<T, S>){
+        self.nodes = graph.nodes.iter().map(|x| NCNode{id: mapper.get(&x.id).unwrap().clone() as u32, seq: x.seq.clone(), opt: x.opt.clone()}).collect();
+        let a = graph.edges.iter().map(|x| x.convert()).into_iter();
+        let mut aa = Vec::new();
+        for x in a{
+            aa.push(x);
+        }
+        self.paths = graph.paths.iter().map(|x| NCPath{name: x.name.clone(), dir: x.dir.clone(), nodes: x.nodes.iter().map(|y| mapper.get(y).unwrap().clone() as u32).collect(), overlap: x.overlap.clone() }).collect();
+        self.mapper = Some(mapper)
+
+    }
+
+    /// Write the graph to a file
+    pub fn to_file(self, file_name: &str){
+        let f = File::create(file_name).expect("Unable to create file");
+        let mut f = BufWriter::new(f);
+
+        write!(f, "{}\n",  self.header.to_string1()).expect("Not able to write");
+        for node in self.nodes.iter() {
+            write!(f, "{}\n", node.to_string()).expect("Not able to write");
+        }
+        for edge in self.edges.iter() {
+            write!(f, "{}\n", edge.to_string()).expect("Not able to write");
+        }
+        for path in self.paths.iter() {
+            write!(f, "{}\n", path.to_string2()).expect("Not able to write");
+        }
+    }
+
 }
+
+
 //
 //     /// Mapper<&String, usize> -> Vec<&String>
 //     ///
@@ -949,25 +1030,8 @@ impl  <T: OptFields, S: IsEdges<T>>NCGfa <T, S> {
 //         }
 //     }
 //
-//     /// Create mapper from old node id to new id
-//     pub fn make_mapper<T: OptFields, S: IsEdges>(&mut self, graph: &mut Gfa<T, S>) -> HashMap<String, usize> {
-//         let mut f = graph.nodes.iter().map(|x| x.id.clone()).collect::<Vec<String>>();
-//         f.sort_by_key(|digit| digit.parse::<u32>().unwrap());
-//         let mut wrapper = HashMap::new();
-//         for (i, node) in f.iter().enumerate() {
-//             wrapper.insert(node.clone(), i+1);
-//         }
-//         wrapper
-//     }
 //
-//     /// Convert the "old" graph with the mapper
-//     pub fn convert_with_mapper<T: OptFields, S: IsEdges>(&mut self, mapper: HashMap<String, usize>, graph: &Gfa<T, S>){
-//         self.nodes = graph.nodes.iter().map(|x| NNode{id: *mapper.get(&x.id).unwrap() as u32, seq: x.seq.clone()}).collect();
-//         self.edges = graph.edges.iter().map(|x| NEdge{from: *mapper.get(&x.from).unwrap() as u32, from_dir: x.from_dir, to: *mapper.get(&x.to).unwrap() as u32, to_dir: x.to_dir}).collect();
-//         self.paths = graph.paths.iter().map(|x| NPath{name: x.name.clone(), dir: x.dir.clone(), nodes: x.nodes.iter().map(|y| *mapper.get(y).unwrap() as u32).collect()}).collect();
-//         self.mapper = Some(mapper)
-//
-//     }
+
 //
 //
 
