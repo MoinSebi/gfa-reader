@@ -172,7 +172,7 @@ impl <T: OptFields>Node<T> {
 
 pub trait IsEdges<T: OptFields>: Sized + Default + Clone{
     type ReturnType;
-    type NewType: IsEdges<T>;
+
     /// Return a slice over all optional fields. NB: This may be
     /// replaced by an iterator or something else in the future
     fn fields(&self) -> Option<&Self::ReturnType>;
@@ -188,7 +188,7 @@ pub trait IsEdges<T: OptFields>: Sized + Default + Clone{
 
     fn to_string(&self) -> String;
 
-    fn convert(&self) -> Self::NewType;
+    fn convert(&self) -> NCEdge<T>;
 
 
 }
@@ -199,7 +199,6 @@ pub trait IsEdges<T: OptFields>: Sized + Default + Clone{
 /// methods are no-ops.
 impl <T: OptFields>IsEdges<T> for () {
     type ReturnType = ();
-    type NewType = ();
 
     fn fields(&self) -> Option<&Self::ReturnType> {
         None
@@ -216,8 +215,9 @@ impl <T: OptFields>IsEdges<T> for () {
     fn to_string(&self) -> String {"".to_string()
     }
 
-    fn convert(&self) -> Self::NewType {
-        ()
+    fn convert(&self) -> NCEdge<T> {
+        return NCEdge{from: 0, from_dir: true, to: 0, to_dir: true, overlap: "sada".to_string(), opt: T::parse(vec![""])};
+
     }
 }
 
@@ -227,7 +227,6 @@ impl <T: OptFields>IsEdges<T> for () {
 /// be efficient enough.
 impl <T: OptFields> IsEdges <T> for Edge<T> {
     type ReturnType = Edge<T>;
-    type NewType = NCEdge<T>;
     fn new() -> Self {
         Edge{from: "".to_string(), from_dir: false, to: "".to_string(), to_dir: false, overlap: "".to_string(), opt: T::new()}
     }
@@ -251,15 +250,14 @@ impl <T: OptFields> IsEdges <T> for Edge<T> {
         self.to_string_link()
     }
 
-    fn convert(&self) -> Self::NewType {
-        NCEdge{from: self.from.parse().unwrap(), from_dir: self.from_dir, to: self.to.parse().unwrap(), to_dir: self.to_dir, overlap: self.overlap.clone(), opt: self.opt.clone()}
+    fn convert(&self) -> NCEdge<T>{
+        NCEdge{from: self.from.parse().unwrap(), from_dir: self.from_dir.clone(), to: self.to.parse().unwrap(), to_dir: self.to_dir.clone(), overlap: self.overlap.clone(), opt: self.opt.clone()}
     }
 }
 
 
 impl <T: OptFields> IsEdges <T> for NCEdge<T> {
     type ReturnType = NCEdge<T>;
-    type NewType = ();
 
     fn fields(&self) -> Option<&Self::ReturnType>{
         Some(self)
@@ -283,13 +281,10 @@ impl <T: OptFields> IsEdges <T> for NCEdge<T> {
         self.to_string_link()
     }
 
-    fn convert(&self) -> Self::NewType {
-        ()
+    fn convert(&self) -> NCEdge<T>{
+        NCEdge{from: self.from.clone(), from_dir: self.from_dir.clone(), to: self.to.clone(), to_dir: self.to_dir.clone(), overlap: self.overlap.clone(), opt: self.opt.clone()}
     }
 }
-
-
-
 
 
 
@@ -431,6 +426,7 @@ pub struct Gfa<T: OptFields, S: IsEdges<T>>{
     pub paths: Vec<Path>,
     pub edges: Vec<S>,
     pub header: Header,
+    pub String2index: HashMap<String, usize>,
 }
 
 
@@ -450,7 +446,8 @@ impl <T: OptFields, S: IsEdges<T>>Gfa <T, S>{
             nodes: Vec::new(),
             paths: Vec::new(),
             edges: Vec::new(),
-            header: Header{tag: "".to_string(), typ: "".to_string(), version_number: "".to_string()}
+            header: Header{tag: "".to_string(), typ: "".to_string(), version_number: "".to_string()},
+            String2index: HashMap::new(),
 
         }
     }
@@ -480,7 +477,7 @@ impl <T: OptFields, S: IsEdges<T>>Gfa <T, S>{
         if is_digit {
             let mut numeric_nodes = self.nodes.iter().map(|x| x.id.parse::<usize>().unwrap()).collect::<Vec<usize>>();
             numeric_nodes.sort();
-            let f = numeric_nodes.windows(2).all(|pair| pair[1] == pair[0] + 1);
+            let f = numeric_nodes.windows(2).all(|pair| pair[1] == &pair[0] + 1);
 
             // Check the min
             let mm = numeric_nodes.iter().cloned().min().unwrap();
@@ -678,9 +675,6 @@ impl <'a, T: isPath> GraphWrapper<'a, T>{
 /// The graph contains of nodes, path and edges. NCGfa = NumericCompactGfa
 /// This is a compact graph representation of the GFA file.
 ///
-/// The goal:
-/// - Direct implementation of map
-///
 /// Comment: Implementation here are much faster and do include some derivates of parser and data
 /// structures that are not parsing the whole file and/or are faster with the downside of more
 /// memory.
@@ -689,7 +683,7 @@ pub struct NCGfa<T: OptFields, S: IsEdges<T>>{
     pub nodes: Vec<NCNode<T>>,
     pub paths: Vec<NCPath>,
     pub edges: Vec<S>,
-    pub mapper: Option<HashMap<String, usize>>,
+    pub mapper: Vec<String>
 }
 
 
@@ -833,7 +827,7 @@ impl  <T: OptFields, S: IsEdges<T>>NCGfa <T, S> {
             nodes: Vec::new(),
             paths: Vec::new(),
             edges: Vec::new(),
-            mapper: None,
+            mapper: Vec::new(),
         }
     }
 
@@ -846,7 +840,7 @@ impl  <T: OptFields, S: IsEdges<T>>NCGfa <T, S> {
     /// let mut graph = Gfa::new();
     /// graph.parse_gfa_file("/path/to/graph");
     /// ´´´
-    pub fn parse_gfa_file(&mut self, file_name: &str) {
+    pub fn parse_gfa_file_direct(&mut self, file_name: &str) {
 
 
         if file_path::new(file_name).exists() {
@@ -920,7 +914,29 @@ impl  <T: OptFields, S: IsEdges<T>>NCGfa <T, S> {
 
     }
 
-    /// Create mapper from old node id to new id
+
+    /// Read the graph from a file
+    ///
+    /// # Example
+    ///
+    /// ```rust, ignore
+    /// use gfa_reader::Gfa;
+    /// let mut graph = Gfa::new();
+    /// graph.parse_gfa_file("/path/to/graph");
+    /// ´´´
+    pub fn parse_gfa_file_and_convert(&mut self, file_name: &str) {
+
+        let mut graph: Gfa<T,S> = Gfa::new();
+        graph.parse_gfa_file(file_name);
+        let ncgraph: NCGfa<T, S> = graph.convert_to_ncgraph(&graph);
+        self.header = ncgraph.header;
+        self.nodes = ncgraph.nodes;
+        self.edges = ncgraph.edges;
+        self.paths = ncgraph.paths;
+
+    }
+
+    /// Create a mapper
     pub fn make_mapper(&mut self, graph: & Gfa<T, S>) -> HashMap<String, usize> {
         let mut f = graph.nodes.iter().map(|x| x.id.clone()).collect::<Vec<String>>();
         f.sort_by_key(|digit| digit.parse::<u32>().unwrap());
@@ -933,14 +949,19 @@ impl  <T: OptFields, S: IsEdges<T>>NCGfa <T, S> {
 
     /// Convert the "old" graph with the mapper
     pub fn convert_with_mapper(&mut self, mapper: HashMap<String, usize>, graph: &Gfa<T, S>){
-        self.nodes = graph.nodes.iter().map(|x| NCNode{id: mapper.get(&x.id).unwrap().clone() as u32, seq: x.seq.clone(), opt: x.opt.clone()}).collect();
+        let mut nodes: Vec<NCNode<T>> = graph.nodes.iter().map(|x| NCNode{id: mapper.get(&x.id).unwrap().clone() as u32, seq: x.seq.clone(), opt: x.opt.clone()}).collect();
+        nodes.sort_by_key(|a| a.id);
+        self.nodes = nodes;
         let a = graph.edges.iter().map(|x| x.convert()).into_iter();
         let mut aa = Vec::new();
         for x in a{
             aa.push(x);
         }
+        //self.edges = aa;
         self.paths = graph.paths.iter().map(|x| NCPath{name: x.name.clone(), dir: x.dir.clone(), nodes: x.nodes.iter().map(|y| mapper.get(y).unwrap().clone() as u32).collect(), overlap: x.overlap.clone() }).collect();
-        self.mapper = Some(mapper)
+        let mut test: Vec<(&usize, String)> = mapper.iter().map(|a| (a.1, a.0.clone())).collect();
+        test.sort_by_key(|a| a.0);
+        self.mapper = test.iter().map(|a| a.1.clone()).collect();
 
     }
 
@@ -960,7 +981,6 @@ impl  <T: OptFields, S: IsEdges<T>>NCGfa <T, S> {
             write!(f, "{}\n", path.to_string2()).expect("Not able to write");
         }
     }
-
 }
 
 
@@ -1035,68 +1055,6 @@ impl  <T: OptFields, S: IsEdges<T>>NCGfa <T, S> {
 //
 //
 
-// //
-// /// GFA wrapper
-// ///
-// /// This is important for PanSN graphs
-// /// Since the node space is the same, only path need to be merged (which can be done easily)
-// pub struct NCGraphWrapper<'a>{
-//     pub genomes: Vec<(String, Vec<&'a NPath>)>,
-//     pub path2genome: HashMap<&'a String, String>
-// }
-//
-//
-// impl <'a> NCGraphWrapper<'a>{
-//
-//     /// Constructor (empty)
-//     pub fn new() -> Self{
-//         Self{
-//             genomes: Vec::new(),
-//             path2genome: HashMap::new(),
-//         }
-//     }
-//
-//
-//
-//
-//     /// GFA -> Wrapper
-//     /// If delimiter == " " (nothing)
-//     ///     -> No merging
-//     pub fn from_ngfa(& mut self, paths: &NCPath, del: &str) {
-//         let mut name2pathvec: HashMap<String, Vec<&'a NCPath>> = HashMap::new();
-//         if del == " " {
-//             for path in paths.iter() {
-//                 name2pathvec.insert(path.name.clone(), vec![path]);
-//             }
-//         } else {
-//             for path in paths.iter() {
-//                 let name_split: Vec<&str> = path.name.split(del).collect();
-//                 let name_first = name_split[0].clone();
-//                 if name2pathvec.contains_key(&name_first.to_owned().clone()) {
-//                     name2pathvec.get_mut(&name_first.to_owned().clone()).unwrap().push(path)
-//                 } else {
-//                     name2pathvec.insert(name_first.to_owned().clone(), vec![path]);
-//                 }
-//             }
-//         }
-//         let mut name2path_value: Vec<(String, Vec<&'a NCPath>)> = Vec::new();
-//         let mut path_names: Vec<String> = name2pathvec.keys().cloned().collect();
-//         path_names.sort();
-//         for path_name in path_names.iter(){
-//             name2path_value.push((path_name.clone(), name2pathvec.get(path_name).unwrap().clone()));
-//         }
-//         let mut name2group = HashMap::new();
-//         for (name, group) in name2path_value.iter(){
-//             for path in group.iter(){
-//                 name2group.insert(&path.name, name.to_owned());
-//             }
-//         }
-//         self.path2genome = name2group;
-//         self.genomes = name2path_value;
-//     }
-// }
-//
-//
 //
 // /// Check if a file has compact and numeric nodes
 // pub fn read_nodes(filename: &str) -> bool{
@@ -1150,8 +1108,10 @@ pub fn create_sort_numeric(nodes: &Vec<&str>) -> Vec<usize> {
     numeric_nodes
 }
 
+
+/// Check if the vector is compact
 pub fn vec_is_compact(numeric_nodes: &Vec<usize>) -> bool{
-    numeric_nodes.windows(2).all(|pair| pair[1] == pair[0] + 1)
+    numeric_nodes.windows(2).all(|pair| pair[1] == &pair[0] + 1)
 }
 
 
