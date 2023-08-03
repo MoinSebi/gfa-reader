@@ -1,3 +1,4 @@
+use std::arch::asm;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{prelude::*, BufReader};
@@ -167,129 +168,6 @@ impl <T: OptFields>Node<T> {
 
 
 
-
-
-
-pub trait IsEdges<T: OptFields>: Sized + Default + Clone{
-    type ReturnType;
-
-    /// Return a slice over all optional fields. NB: This may be
-    /// replaced by an iterator or something else in the future
-    fn fields(&self) -> Option<&Self::ReturnType>;
-
-    /// Given an iterator over bytestrings, each expected to hold one
-    /// optional field (in the <TAG>:<TYPE>:<VALUE> format), parse
-    /// them as optional fields to create a collection. Returns `Self`
-    /// rather than `Option<Self>` for now, but this may be changed to
-    /// become fallible in the future.
-    fn parse(input: Vec<&str>) -> Self;
-
-    fn new() -> Self;
-
-    fn to_string(&self) -> String;
-
-    fn convert(&self) -> NCEdge<T>;
-
-
-}
-
-
-/// This implementation is useful for performance if we don't actually
-/// need any optional fields. () takes up zero space, and all
-/// methods are no-ops.
-impl <T: OptFields>IsEdges<T> for () {
-    type ReturnType = ();
-
-    fn fields(&self) -> Option<&Self::ReturnType> {
-        None
-    }
-
-    #[inline]
-    fn parse(_input: Vec<&str>) -> Self
-    {
-    }
-
-    fn new() -> Self {
-    }
-
-    fn to_string(&self) -> String {"".to_string()
-    }
-
-    fn convert(&self) -> NCEdge<T> {
-        return NCEdge{from: 0, from_dir: true, to: 0, to_dir: true, overlap: "sada".to_string(), opt: T::parse(vec![""])};
-
-    }
-}
-
-/// Stores all the optional fields in a vector. `get_field` simply
-/// uses std::iter::Iterator::find(), but as there are only a
-/// relatively small number of optional fields in practice, it should
-/// be efficient enough.
-impl <T: OptFields> IsEdges <T> for Edge<T> {
-    type ReturnType = Edge<T>;
-    fn new() -> Self {
-        Edge{from: "".to_string(), from_dir: false, to: "".to_string(), to_dir: false, overlap: "".to_string(), opt: T::new()}
-    }
-    fn fields(&self) -> Option<&Self::ReturnType>{
-        Some(self)
-    }
-
-    #[inline]
-    fn parse(line_split: Vec<&str>) -> Self{
-        let mut edge = Edge { from: "".to_string(), to: "".to_string(), from_dir: false, to_dir: false, overlap: "0".to_string(), opt: T::new()};
-        edge.from = line_split[1].parse().unwrap();
-        edge.to = line_split[3].parse().unwrap();
-        edge.to_dir = if line_split[4] == "+" { !false } else { !true };
-        edge.from_dir = if line_split[2] == "+" { !false } else { !true };
-        edge.overlap = line_split[5].parse().unwrap();
-        edge.opt = T::parse(line_split);
-        edge
-    }
-
-    fn to_string(&self) -> String {
-        self.to_string_link()
-    }
-
-    fn convert(&self) -> NCEdge<T>{
-        NCEdge{from: self.from.parse().unwrap(), from_dir: self.from_dir.clone(), to: self.to.parse().unwrap(), to_dir: self.to_dir.clone(), overlap: self.overlap.clone(), opt: self.opt.clone()}
-    }
-}
-
-
-impl <T: OptFields> IsEdges <T> for NCEdge<T> {
-    type ReturnType = NCEdge<T>;
-
-    fn fields(&self) -> Option<&Self::ReturnType>{
-        Some(self)
-    }
-    fn parse(line_split: Vec<&str>) -> Self{
-        let mut edge = NCEdge{from: 0, from_dir: false, to: 0, to_dir: false, overlap: "0".to_string(), opt: T::new()};
-        edge.from = line_split[1].parse().unwrap();
-        edge.to = line_split[3].parse().unwrap();
-        edge.to_dir = if line_split[4] == "+" { !false } else { !true };
-        edge.from_dir = if line_split[2] == "+" { !false } else { !true };
-        edge.overlap = line_split[5].parse().unwrap();
-        edge.opt = T::parse(line_split);
-        edge
-    }
-
-    fn new() -> Self {
-        NCEdge{from: 0, from_dir: false, to: 0, to_dir: false, overlap: "0".to_string(), opt: T::new()}
-    }
-
-    fn to_string(&self) -> String {
-        self.to_string_link()
-    }
-
-    fn convert(&self) -> NCEdge<T>{
-        NCEdge{from: self.from.clone(), from_dir: self.from_dir.clone(), to: self.to.clone(), to_dir: self.to_dir.clone(), overlap: self.overlap.clone(), opt: self.opt.clone()}
-    }
-}
-
-
-
-
-
 #[derive(Debug, PartialEq, Clone, Default)]
 /// Graph edges
 /// - From
@@ -421,31 +299,31 @@ impl Path {
 /// Comment: This implementation should be able to parse any kind of GFAv1, but has increased
 /// memory consumption, since most node ids are stored at Strings which are a minimum of 24 bytes.
 /// This is only maintained, since it is not of further use in any of my projects.
-pub struct Gfa<T: OptFields, S: IsEdges<T>>{
+pub struct Gfa<T: OptFields>{
     pub nodes: Vec<Node<T>>,
     pub paths: Vec<Path>,
-    pub edges: Vec<S>,
+    pub edges: Option<Vec<Edge<T>>>,
     pub header: Header,
     pub String2index: HashMap<String, usize>,
 }
 
 
 
-impl <T: OptFields, S: IsEdges<T>>Gfa <T, S>{
+impl <T: OptFields> Gfa <T>{
     /// Graph constructor
     ///
     /// # Example
     ///
     /// ```
     /// use gfa_reader::Gfa;
-    /// let graph: Gfa<(), ()> = Gfa::new();
+    /// let graph: Gfa<()> = Gfa::new();
     ///
     /// ```
     pub fn new() -> Self {
         Self {
             nodes: Vec::new(),
             paths: Vec::new(),
-            edges: Vec::new(),
+            edges: None,
             header: Header{tag: "".to_string(), typ: "".to_string(), version_number: "".to_string()},
             String2index: HashMap::new(),
 
@@ -504,7 +382,7 @@ impl <T: OptFields, S: IsEdges<T>>Gfa <T, S>{
     /// let mut graph = Gfa::new();
     /// graph.parse_gfa_file("/path/to/graph");
     /// ´´´
-    pub fn parse_gfa_file(&mut self, file_name: &str) {
+    pub fn parse_gfa_file(&mut self, file_name: &str, edge: bool) {
 
 
         if file_path::new(file_name).exists() {
@@ -519,7 +397,7 @@ impl <T: OptFields, S: IsEdges<T>>Gfa <T, S>{
 
 
             let mut nodes: Vec<Node<T>> = Vec::new();
-
+            let mut edges: Vec<Edge<T>> = Vec::new();
             // Iterate over lines
             for line in reader.lines() {
                 let l = line.unwrap();
@@ -549,17 +427,16 @@ impl <T: OptFields, S: IsEdges<T>>Gfa <T, S>{
 
                     },
                     "L" => {
+                        if edge {
+                            edges.push(Edge{from: line_split[1].parse().unwrap(), from_dir: if line_split[2] == "+" { !false } else { !true }, to: line_split[3].parse().unwrap(), to_dir: if line_split[4] == "+" { !false } else { !true }, overlap: line_split[5].parse().unwrap(), opt: T::parse(line_split)})
 
-                        let a = S::parse(line_split);
-                        if let Some(value) = a.fields(){
-                            self.edges.push(a);
                         }
 
                     }
                     "C" => {
-                        let a = S::parse(line_split);
-                        if let Some(value) = a.fields(){
-                            self.edges.push(a);
+                        if edge {
+                            edges.push(Edge{from: line_split[1].parse().unwrap(), from_dir: if line_split[2] == "+" { !false } else { !true }, to: line_split[3].parse().unwrap(), to_dir: if line_split[4] == "+" { !false } else { !true }, overlap: line_split[5].parse().unwrap(), opt: T::parse(line_split)})
+
                         }
                     }
                     "H" => {
@@ -571,7 +448,9 @@ impl <T: OptFields, S: IsEdges<T>>Gfa <T, S>{
                 }
 
             }
-
+            if edge {
+                self.edges = Some(edges);
+            }
             self.nodes.extend(nodes);
 
         }
@@ -587,8 +466,13 @@ impl <T: OptFields, S: IsEdges<T>>Gfa <T, S>{
         for node in self.nodes.iter() {
             write!(f, "{}\n", node.to_string()).expect("Not able to write");
         }
-        for edge in self.edges.iter() {
-            write!(f, "{}\n", edge.to_string()).expect("Not able to write");
+        match &self.edges {
+            Some(value) =>{
+                for edge in self.edges.as_ref().unwrap().iter() {
+                    write!(f, "{}\n", edge.to_string_link()).expect("Not able to write");
+                }
+            }
+            _ => {}
         }
         for path in self.paths.iter() {
             write!(f, "{}\n", path.to_string()).expect("Not able to write");
@@ -596,8 +480,8 @@ impl <T: OptFields, S: IsEdges<T>>Gfa <T, S>{
     }
 
 
-    pub fn convert_to_ncgraph(& self, graph: &Gfa<T, S>) -> NCGfa<T, S>{
-        let mut ncgraph: NCGfa<T, S> = NCGfa::new();
+    pub fn convert_to_ncgraph(& self, graph: &Gfa<T>, edge: bool) -> NCGfa<T>{
+        let mut ncgraph: NCGfa<T> = NCGfa::new();
         let f = ncgraph.make_mapper(graph);
         ncgraph.convert_with_mapper(f, &graph);
         ncgraph
@@ -678,11 +562,11 @@ impl <'a, T: isPath> GraphWrapper<'a, T>{
 /// Comment: Implementation here are much faster and do include some derivates of parser and data
 /// structures that are not parsing the whole file and/or are faster with the downside of more
 /// memory.
-pub struct NCGfa<T: OptFields, S: IsEdges<T>>{
+pub struct NCGfa<T: OptFields>{
     pub header: Header,
     pub nodes: Vec<NCNode<T>>,
     pub paths: Vec<NCPath>,
-    pub edges: Vec<S>,
+    pub edges: Option<Vec<NCEdge<T>>>,
     pub mapper: Vec<String>
 }
 
@@ -806,7 +690,7 @@ impl isPath for NCPath{
     }
 }
 
-impl  <T: OptFields, S: IsEdges<T>>NCGfa <T, S> {
+impl  <T: OptFields>NCGfa <T> {
 
     /// NGraph constructor
     ///
@@ -814,7 +698,7 @@ impl  <T: OptFields, S: IsEdges<T>>NCGfa <T, S> {
     ///
     /// ```
     /// use gfa_reader::NCGfa;
-    /// let graph: NCGfa<(), ()> = NCGfa::new();
+    /// let graph: NCGfa<()> = NCGfa::new();
     ///
     /// ```
     pub fn new() -> Self {
@@ -826,7 +710,7 @@ impl  <T: OptFields, S: IsEdges<T>>NCGfa <T, S> {
             },
             nodes: Vec::new(),
             paths: Vec::new(),
-            edges: Vec::new(),
+            edges: None,
             mapper: Vec::new(),
         }
     }
@@ -840,7 +724,7 @@ impl  <T: OptFields, S: IsEdges<T>>NCGfa <T, S> {
     /// let mut graph = Gfa::new();
     /// graph.parse_gfa_file("/path/to/graph");
     /// ´´´
-    pub fn parse_gfa_file_direct(&mut self, file_name: &str) {
+    pub fn parse_gfa_file_direct(&mut self, file_name: &str, edge: bool) {
 
 
         if file_path::new(file_name).exists() {
@@ -855,6 +739,7 @@ impl  <T: OptFields, S: IsEdges<T>>NCGfa <T, S> {
 
 
             let mut nodes: Vec<NCNode<T>> = Vec::new();
+            let mut edges: Vec<NCEdge<T>> = Vec::new();
 
             // Iterate over lines
             for line in reader.lines() {
@@ -886,16 +771,16 @@ impl  <T: OptFields, S: IsEdges<T>>NCGfa <T, S> {
                     },
                     "L" => {
 
-                        let a = S::parse(line_split);
-                        if let Some(value) = a.fields(){
-                            self.edges.push(a);
+                        if edge {
+                            edges.push(NCEdge{from: line_split[1].parse().unwrap(), from_dir: if line_split[2] == "+" { !false } else { !true }, to: line_split[3].parse().unwrap(), to_dir: if line_split[4] == "+" { !false } else { !true }, overlap: line_split[5].parse().unwrap(), opt: T::parse(line_split)})
+
                         }
 
                     }
                     "C" => {
-                        let a = S::parse(line_split);
-                        if let Some(value) = a.fields(){
-                            self.edges.push(a);
+                        if edge {
+                            edges.push(NCEdge{from: line_split[1].parse().unwrap(), from_dir: if line_split[2] == "+" { !false } else { !true }, to: line_split[3].parse().unwrap(), to_dir: if line_split[4] == "+" { !false } else { !true }, overlap: line_split[5].parse().unwrap(), opt: T::parse(line_split)})
+
                         }
                     }
                     "H" => {
@@ -924,11 +809,11 @@ impl  <T: OptFields, S: IsEdges<T>>NCGfa <T, S> {
     /// let mut graph = Gfa::new();
     /// graph.parse_gfa_file("/path/to/graph");
     /// ´´´
-    pub fn parse_gfa_file_and_convert(&mut self, file_name: &str) {
+    pub fn parse_gfa_file_and_convert(&mut self, file_name: &str, edges: bool) {
 
-        let mut graph: Gfa<T,S> = Gfa::new();
-        graph.parse_gfa_file(file_name);
-        let ncgraph: NCGfa<T, S> = graph.convert_to_ncgraph(&graph);
+        let mut graph: Gfa<T> = Gfa::new();
+        graph.parse_gfa_file(file_name, edges);
+        let ncgraph: NCGfa<T> = graph.convert_to_ncgraph(&graph, edges, );
         self.header = ncgraph.header;
         self.nodes = ncgraph.nodes;
         self.edges = ncgraph.edges;
@@ -937,7 +822,7 @@ impl  <T: OptFields, S: IsEdges<T>>NCGfa <T, S> {
     }
 
     /// Create a mapper
-    pub fn make_mapper(&mut self, graph: & Gfa<T, S>) -> HashMap<String, usize> {
+    pub fn make_mapper(&mut self, graph: & Gfa<T>) -> HashMap<String, usize> {
         let mut f = graph.nodes.iter().map(|x| x.id.clone()).collect::<Vec<String>>();
         f.sort_by_key(|digit| digit.parse::<u32>().unwrap());
         let mut wrapper = HashMap::new();
@@ -948,16 +833,18 @@ impl  <T: OptFields, S: IsEdges<T>>NCGfa <T, S> {
     }
 
     /// Convert the "old" graph with the mapper
-    pub fn convert_with_mapper(&mut self, mapper: HashMap<String, usize>, graph: &Gfa<T, S>){
+    pub fn convert_with_mapper(&mut self, mapper: HashMap<String, usize>, graph: &Gfa<T>){
         let mut nodes: Vec<NCNode<T>> = graph.nodes.iter().map(|x| NCNode{id: mapper.get(&x.id).unwrap().clone() as u32, seq: x.seq.clone(), opt: x.opt.clone()}).collect();
         nodes.sort_by_key(|a| a.id);
         self.nodes = nodes;
-        let a = graph.edges.iter().map(|x| x.convert()).into_iter();
-        let mut aa = Vec::new();
-        for x in a{
-            aa.push(x);
+        self.edges = None;
+        match &graph.edges{
+            Some(value) => {
+                self.edges = Some(graph.edges.as_ref().unwrap().iter().map(|x| NCEdge{from: mapper.get(&x.from).unwrap().clone() as u32, from_dir: x.from_dir.clone(), to: mapper.get(&x.to).unwrap().clone() as u32, to_dir: x.to_dir.clone(), overlap: "".to_string(), opt: x.opt.clone() }).collect());
+
+            }
+            _ =>{}
         }
-        //self.edges = aa;
         self.paths = graph.paths.iter().map(|x| NCPath{name: x.name.clone(), dir: x.dir.clone(), nodes: x.nodes.iter().map(|y| mapper.get(y).unwrap().clone() as u32).collect(), overlap: x.overlap.clone() }).collect();
         let mut test: Vec<(&usize, String)> = mapper.iter().map(|a| (a.1, a.0.clone())).collect();
         test.sort_by_key(|a| a.0);
@@ -974,8 +861,13 @@ impl  <T: OptFields, S: IsEdges<T>>NCGfa <T, S> {
         for node in self.nodes.iter() {
             write!(f, "{}\n", node.to_string()).expect("Not able to write");
         }
-        for edge in self.edges.iter() {
-            write!(f, "{}\n", edge.to_string()).expect("Not able to write");
+        match &self.edges {
+            Some(value) =>{
+                for edge in self.edges.unwrap().iter() {
+                    write!(f, "{}\n", edge.to_string_link()).expect("Not able to write");
+                }
+            }
+            _ => {}
         }
         for path in self.paths.iter() {
             write!(f, "{}\n", path.to_string2()).expect("Not able to write");
