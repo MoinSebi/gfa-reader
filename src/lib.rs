@@ -4,6 +4,7 @@ use std::fs::File;
 use std::io::{prelude::*, BufReader};
 use std::io::{BufWriter, Write};
 use std::path::Path as file_path;
+use std::str::Split;
 use flate2::read::GzDecoder;
 use std::time::{Duration, Instant};
 
@@ -66,7 +67,7 @@ pub trait OptFields: Sized + Default + Clone {
     /// them as optional fields to create a collection. Returns `Self`
     /// rather than `Option<Self>` for now, but this may be changed to
     /// become fallible in the future.
-    fn parse(input: Vec<&str>) -> Self;
+    fn parse(input: Split<&str>) -> Self;
 
     fn new() -> Self;
     fn iter(&self) -> std::slice::Iter<OptElem> {
@@ -86,7 +87,7 @@ impl OptFields for () {
         &[]
     }
 
-    fn parse(_input: Vec<&str>) -> Self
+    fn parse(mut input: Split<&str> ) -> Self
     {
     }
 
@@ -107,17 +108,17 @@ impl OptFields for Vec<OptElem> {
     fn fields(&self) -> &[OptElem] {
         self.as_slice()
     }
-    fn parse(input: Vec<&str>) -> Self{
-        if input.len() < 4 {
-            return Vec::new();
-        }
+    fn parse(mut input: Split<&str> ) -> Self{
         let mut fields = Vec::new();
-        for field in input {
-            let mut parts = field.split(':');
+
+        while let Some(value) = input.next() {
+
+            let mut parts = value.split(':');
             let tag = parts.next().unwrap();
             let typ = parts.next().unwrap();
             let val = parts.next().unwrap();
             fields.push(OptElem {key: tag.to_string(), typ: typ.to_string(), val: val.to_string()});
+
         }
         fields
     }
@@ -401,12 +402,15 @@ impl <T: OptFields> Gfa <T>{
             // Iterate over lines
             for line in reader.lines() {
                 let l = line.unwrap();
+                let l2 = l.clone();
+                let mut a = l2.split("\t");
+                let first = a.next().unwrap();
                 let line_split: Vec<&str> = l.split("\t").collect();
-                match line_split[0] {
+                match first {
                     "S" => {
 
 
-                        nodes.push(Node { id: line_split[1].to_string(), seq: line_split[2].to_string(), opt: T::parse(line_split) });
+                        nodes.push(Node { id: a.next().unwrap().parse().unwrap(), seq:  a.next().unwrap().parse().unwrap(), opt: T::parse(a) });
 
 
                     },
@@ -428,14 +432,16 @@ impl <T: OptFields> Gfa <T>{
                     },
                     "L" => {
                         if edge {
-                            edges.push(Edge{from: line_split[1].parse().unwrap(), from_dir: if line_split[2] == "+" { !false } else { !true }, to: line_split[3].parse().unwrap(), to_dir: if line_split[4] == "+" { !false } else { !true }, overlap: line_split[5].parse().unwrap(), opt: T::parse(line_split)})
+
+                            //edges.push(Edge{from: line_split[1].parse().unwrap(), from_dir: if line_split[2] == "+" { !false } else { !true }, to: line_split[3].parse().unwrap(), to_dir: if line_split[4] == "+" { !false } else { !true }, overlap: line_split[5].parse().unwrap(), opt: T::parse(line_split)});
+                            edges.push(Edge{from: a.next().unwrap().to_string(), from_dir: if a.next().unwrap() == "+" { !false } else { !true }, to: a.next().unwrap().to_string(), to_dir: if a.next().unwrap() == "+" { !false } else { !true }, overlap: a.next().unwrap().to_string(), opt: T::parse(a)});
 
                         }
 
                     }
                     "C" => {
                         if edge {
-                            edges.push(Edge{from: line_split[1].parse().unwrap(), from_dir: if line_split[2] == "+" { !false } else { !true }, to: line_split[3].parse().unwrap(), to_dir: if line_split[4] == "+" { !false } else { !true }, overlap: line_split[5].parse().unwrap(), opt: T::parse(line_split)})
+                            edges.push(Edge{from: a.next().unwrap().to_string(), from_dir: if a.next().unwrap() == "+" { !false } else { !true }, to: a.next().unwrap().to_string(), to_dir: if a.next().unwrap() == "+" { !false } else { !true }, overlap: a.next().unwrap().to_string(), opt: T::parse(a)});
 
                         }
                     }
@@ -748,8 +754,10 @@ impl  <T: OptFields>NCGfa <T> {
                 match line_split[0] {
                     "S" => {
 
+                        let mut a = l.split("\t");
+                        a.next();
 
-                        nodes.push(NCNode { id: line_split[1].parse().unwrap(), seq: line_split[2].to_string(), opt: T::parse(line_split) });
+                        nodes.push(NCNode { id: a.next().unwrap().parse().unwrap(), seq:  a.next().unwrap().parse().unwrap(), opt: T::parse(a) });
 
 
                     },
@@ -772,14 +780,20 @@ impl  <T: OptFields>NCGfa <T> {
                     "L" => {
 
                         if edge {
-                            edges.push(NCEdge{from: line_split[1].parse().unwrap(), from_dir: if line_split[2] == "+" { !false } else { !true }, to: line_split[3].parse().unwrap(), to_dir: if line_split[4] == "+" { !false } else { !true }, overlap: line_split[5].parse().unwrap(), opt: T::parse(line_split)})
+                            let mut a = l.split("\t");
+                            a.next();
+                            //edges.push(Edge{from: line_split[1].parse().unwrap(), from_dir: if line_split[2] == "+" { !false } else { !true }, to: line_split[3].parse().unwrap(), to_dir: if line_split[4] == "+" { !false } else { !true }, overlap: line_split[5].parse().unwrap(), opt: T::parse(line_split)});
+                            edges.push(NCEdge{from: a.next().unwrap().parse().unwrap(), from_dir: if a.next().unwrap() == "+" { !false } else { !true }, to: a.next().unwrap().parse().unwrap(), to_dir: if a.next().unwrap() == "+" { !false } else { !true }, overlap: a.next().unwrap().to_string(), opt: T::parse(a)});
 
                         }
 
                     }
                     "C" => {
                         if edge {
-                            edges.push(NCEdge{from: line_split[1].parse().unwrap(), from_dir: if line_split[2] == "+" { !false } else { !true }, to: line_split[3].parse().unwrap(), to_dir: if line_split[4] == "+" { !false } else { !true }, overlap: line_split[5].parse().unwrap(), opt: T::parse(line_split)})
+                            let mut a = l.split("\t");
+                            a.next();
+                            //edges.push(Edge{from: line_split[1].parse().unwrap(), from_dir: if line_split[2] == "+" { !false } else { !true }, to: line_split[3].parse().unwrap(), to_dir: if line_split[4] == "+" { !false } else { !true }, overlap: line_split[5].parse().unwrap(), opt: T::parse(line_split)});
+                            edges.push(NCEdge{from: a.next().unwrap().parse().unwrap(), from_dir: if a.next().unwrap() == "+" { !false } else { !true }, to: a.next().unwrap().parse().unwrap(), to_dir: if a.next().unwrap() == "+" { !false } else { !true }, overlap: a.next().unwrap().to_string(), opt: T::parse(a)});
 
                         }
                     }

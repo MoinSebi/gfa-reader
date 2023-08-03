@@ -7,14 +7,14 @@ use gfa_reader::{Edge, Gfa, NCEdge, NCGfa};
 /// Read a normal graph
 fn gfa_normal(filename: &str){
     let mut graph: Gfa<()> = Gfa::new();
-    graph.parse_gfa_file(filename, false)
+    graph.parse_gfa_file(filename, true)
     //sort_vector(&mut intervals);
 }
 
 /// Read a NC graph
 fn ngfa_normal(filename: &str){
     let mut _intervals: NCGfa<()> = NCGfa::new();
-    let f = _intervals.parse_gfa_file_direct(filename, false);
+    let f = _intervals.parse_gfa_file_direct(filename, true);
     //sort_vector(&mut intervals);
 }
 //
