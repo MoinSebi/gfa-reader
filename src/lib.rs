@@ -26,6 +26,7 @@ impl Header {
 
     /// Parse header from string (H-line)
     fn from_string(line: &str) -> Header {
+        let line = line.split("\t").nth(1).unwrap();
         let tag = line.split(':').nth(0).unwrap().to_string();
         let typ = line.split(':').nth(1).unwrap().to_string();
         let version_number = line.split(':').nth(2).unwrap().to_string();

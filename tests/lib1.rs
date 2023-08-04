@@ -1,6 +1,7 @@
 use gfa_reader::{Edge, Gfa, NCEdge, NCGfa, OptElem};
 
 #[test]
+/// Check full header
 fn read_gfa_header() {
     eprintln!("Read gfa");
     // Example data
@@ -8,6 +9,9 @@ fn read_gfa_header() {
     let mut graph: Gfa<()> = Gfa::new();
     graph.parse_gfa_file(filename, false);
     assert_eq!(graph.header.version_number, "1.0".to_string());
+    assert_eq!(graph.header.tag, "VN".to_string());
+    assert_eq!(graph.header.typ, "Z".to_string());
+
 }
 
 
