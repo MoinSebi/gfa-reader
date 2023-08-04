@@ -1,4 +1,4 @@
-use gfa_reader::{Edge, Gfa, NCEdge, NCGfa, OptElem};
+use gfa_reader::{Edge, Gfa, NCGfa};
 
 #[test]
 /// Check full header
@@ -40,6 +40,17 @@ fn read_gfa_nodes() {
     let mut graph: Gfa<()> = Gfa::new();
     graph.parse_gfa_file(filename, false);
     assert_eq!(graph.nodes[9].opt, ());
+}
+
+#[test]
+fn read_gfa_convert_nodes() {
+    eprintln!("Read gfa");
+    // Example data
+    let filename = "data/size5.gfa";
+    let mut graph: NCGfa<()> = NCGfa::new();
+    graph.parse_gfa_file_direct(filename, false);
+    assert_eq!(graph.nodes[9].opt, ());
+    assert_eq!(graph.nodes[1-1].id, 1);
 }
 
 

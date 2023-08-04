@@ -1,4 +1,3 @@
-use std::arch::asm;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{prelude::*, BufReader};
@@ -6,7 +5,6 @@ use std::io::{BufWriter, Write};
 use std::path::Path as file_path;
 use std::str::Split;
 use flate2::read::GzDecoder;
-use std::time::{Duration, Instant};
 
 
 #[derive(Debug, Clone, Default)]
@@ -88,7 +86,7 @@ impl OptFields for () {
         &[]
     }
 
-    fn parse(mut input: Split<&str> ) -> Self
+    fn parse(_input: Split<&str> ) -> Self
     {
     }
 
@@ -160,6 +158,7 @@ impl <T: OptFields>Node<T> {
         }
     }
 
+    #[allow(dead_code)]
     /// Write node to fasta
     fn to_fasta(&self) -> String {
 
@@ -194,6 +193,7 @@ pub struct Containment<T: OptFields>{
 
 impl <T: OptFields>Containment<T> {
 
+    #[allow(dead_code)]
     /// Write edge to string
     fn to_string_link(&self) -> String {
         let a = format!("L\t{}\t{}\t{}\t{}\t{}\n", self.from, {if self.from_dir{"+"} else {"-"}}, self.to, {if self.to_dir{"+"} else {"-"}}, self.overlap);
@@ -249,7 +249,7 @@ impl <T: OptFields>Edge<T> {
 
 
 
-pub trait isPath{
+pub trait IsPath {
     fn get_name(&self) -> &String;
 }
 
@@ -268,7 +268,7 @@ pub struct Path{
     pub overlap: Vec<String>,
 }
 
-impl isPath for Path{
+impl IsPath for Path{
     fn get_name(&self) -> &String{
         &self.name
     }
@@ -306,7 +306,7 @@ pub struct Gfa<T: OptFields>{
     pub paths: Vec<Path>,
     pub edges: Option<Vec<Edge<T>>>,
     pub header: Header,
-    pub String2index: HashMap<String, usize>,
+    pub string2index: HashMap<String, usize>,
 }
 
 
@@ -327,7 +327,7 @@ impl <T: OptFields> Gfa <T>{
             paths: Vec::new(),
             edges: None,
             header: Header{tag: "".to_string(), typ: "".to_string(), version_number: "".to_string()},
-            String2index: HashMap::new(),
+            string2index: HashMap::new(),
 
         }
     }
@@ -357,7 +357,7 @@ impl <T: OptFields> Gfa <T>{
         if is_digit {
             let mut numeric_nodes = self.nodes.iter().map(|x| x.id.parse::<usize>().unwrap()).collect::<Vec<usize>>();
             numeric_nodes.sort();
-            let f = numeric_nodes.windows(2).all(|pair| pair[1] == &pair[0] + 1);
+            let _f = numeric_nodes.windows(2).all(|pair| pair[1] == &pair[0] + 1);
 
             // Check the min
             let mm = numeric_nodes.iter().cloned().min().unwrap();
@@ -475,7 +475,7 @@ impl <T: OptFields> Gfa <T>{
         }
         match &self.edges {
             Some(value) =>{
-                for edge in self.edges.as_ref().unwrap().iter() {
+                for edge in value.iter() {
                     write!(f, "{}\n", edge.to_string_link()).expect("Not able to write");
                 }
             }
@@ -503,13 +503,13 @@ impl <T: OptFields> Gfa <T>{
 ///
 /// This is important for PanSN graphs
 /// Since the node space is the same, only path need to be merged (which can be done easily)
-pub struct GraphWrapper<'a, T: isPath>{
+pub struct GraphWrapper<'a, T: IsPath>{
     pub genomes: Vec<(String, Vec<&'a T>)>,
     pub path2genome: HashMap<&'a String, String>
 }
 
 
-impl <'a, T: isPath> GraphWrapper<'a, T>{
+impl <'a, T: IsPath> GraphWrapper<'a, T>{
     pub fn new() -> Self{
         Self{
             genomes: Vec::new(),
@@ -606,6 +606,7 @@ impl <T: OptFields>NCNode<T> {
         }
     }
 
+    #[allow(dead_code)]
     /// Write node to fasta
     fn to_fasta(&self) -> String {
 
@@ -691,7 +692,7 @@ impl NCPath{
     }
 }
 
-impl isPath for NCPath{
+impl IsPath for NCPath{
     fn get_name(&self) -> &String{
         &self.name
     }
@@ -855,7 +856,7 @@ impl  <T: OptFields>NCGfa <T> {
         self.edges = None;
         match &graph.edges{
             Some(value) => {
-                self.edges = Some(graph.edges.as_ref().unwrap().iter().map(|x| NCEdge{from: mapper.get(&x.from).unwrap().clone() as u32, from_dir: x.from_dir.clone(), to: mapper.get(&x.to).unwrap().clone() as u32, to_dir: x.to_dir.clone(), overlap: "".to_string(), opt: x.opt.clone() }).collect());
+                self.edges = Some(value.iter().map(|x| NCEdge{from: mapper.get(&x.from).unwrap().clone() as u32, from_dir: x.from_dir.clone(), to: mapper.get(&x.to).unwrap().clone() as u32, to_dir: x.to_dir.clone(), overlap: "".to_string(), opt: x.opt.clone() }).collect());
 
             }
             _ =>{}
@@ -878,7 +879,7 @@ impl  <T: OptFields>NCGfa <T> {
         }
         match &self.edges {
             Some(value) =>{
-                for edge in self.edges.unwrap().iter() {
+                for edge in value.iter() {
                     write!(f, "{}\n", edge.to_string_link()).expect("Not able to write");
                 }
             }
