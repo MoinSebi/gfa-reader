@@ -51,6 +51,10 @@ fn read_gfa_convert_nodes() {
     graph.parse_gfa_file_direct(filename, false);
     assert_eq!(graph.nodes[9].opt, ());
     assert_eq!(graph.nodes[1-1].id, 1);
+    if graph.mapper.len() != graph.nodes.len() {
+        graph.mapper = graph.nodes.iter().map(| x| x.id.to_string()).collect();
+    }
+    assert_eq!(graph.get_old_node(&1),  &1.to_string());
 }
 
 

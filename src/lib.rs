@@ -868,6 +868,10 @@ impl  <T: OptFields>NCGfa <T> {
 
     }
 
+    pub fn get_old_node(&self, node_id: &usize) -> &String{
+        &self.mapper[node_id-1]
+    }
+
     /// Write the graph to a file
     pub fn to_file(self, file_name: &str){
         let f = File::create(file_name).expect("Unable to create file");
