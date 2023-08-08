@@ -1,4 +1,4 @@
-use gfa_reader::{Edge, Gfa, NCGfa};
+use gfa_reader::{Edge, Gfa, GraphWrapper, NCGfa, NCPath, Path};
 
 #[test]
 /// Check full header
@@ -40,6 +40,21 @@ fn read_gfa_nodes() {
     let mut graph: Gfa<()> = Gfa::new();
     graph.parse_gfa_file(filename, false);
     assert_eq!(graph.nodes[9].opt, ());
+    assert_eq!(graph.nodes.len(), 26234);
+    assert_eq!(graph.paths[0].nodes[0], "4".to_string());
+}
+
+
+#[test]
+fn read_gfa_nodes2() {
+    eprintln!("Read gfa");
+    // Example data
+    let filename = "data/size5.gfa";
+    let mut graph: Gfa<()> = Gfa::new();
+    graph.parse_gfa_file(filename, false);
+    let mut gra: GraphWrapper<Path> = GraphWrapper::new();
+    gra.from_gfa(&graph.paths, " ");
+    assert_eq!(gra.genomes.len(), 5);
 }
 
 #[test]
@@ -55,6 +70,11 @@ fn read_gfa_convert_nodes() {
         graph.mapper = graph.nodes.iter().map(| x| x.id.to_string()).collect();
     }
     assert_eq!(graph.get_old_node(&1),  &1.to_string());
+    assert_eq!(graph.nodes.len(), 26234);
+    assert_eq!(graph.nodes[0].id, 1);
+    assert_eq!(graph.paths[0].nodes[0], 4);
+
+
 }
 
 

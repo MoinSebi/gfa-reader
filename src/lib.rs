@@ -19,7 +19,7 @@ pub struct Header {
 impl Header {
     /// Write header to string
     fn to_string1(&self) -> String {
-        format!("H\tVN:Z:\t{}", self.version_number)
+        format!("H\tVN:Z:\t{}\n", self.version_number)
     }
 
     /// Parse header from string (H-line)
@@ -469,20 +469,20 @@ impl <T: OptFields> Gfa <T>{
         let f = File::create(file_name).expect("Unable to create file");
         let mut f = BufWriter::new(f);
 
-        write!(f, "{}\n",  self.header.to_string1()).expect("Not able to write");
+        write!(f, "{}",  self.header.to_string1()).expect("Not able to write");
         for node in self.nodes.iter() {
-            write!(f, "{}\n", node.to_string()).expect("Not able to write");
+            write!(f, "{}", node.to_string()).expect("Not able to write");
         }
         match &self.edges {
             Some(value) =>{
                 for edge in value.iter() {
-                    write!(f, "{}\n", edge.to_string_link()).expect("Not able to write");
+                    write!(f, "{}", edge.to_string_link()).expect("Not able to write");
                 }
             }
             _ => {}
         }
         for path in self.paths.iter() {
-            write!(f, "{}\n", path.to_string()).expect("Not able to write");
+            write!(f, "{}", path.to_string()).expect("Not able to write");
         }
     }
 
@@ -877,20 +877,20 @@ impl  <T: OptFields>NCGfa <T> {
         let f = File::create(file_name).expect("Unable to create file");
         let mut f = BufWriter::new(f);
 
-        write!(f, "{}\n",  self.header.to_string1()).expect("Not able to write");
+        write!(f, "{}",  self.header.to_string1()).expect("Not able to write");
         for node in self.nodes.iter() {
-            write!(f, "{}\n", node.to_string()).expect("Not able to write");
+            write!(f, "{}", node.to_string()).expect("Not able to write");
         }
         match &self.edges {
             Some(value) =>{
                 for edge in value.iter() {
-                    write!(f, "{}\n", edge.to_string_link()).expect("Not able to write");
+                    write!(f, "{}", edge.to_string_link()).expect("Not able to write");
                 }
             }
             _ => {}
         }
         for path in self.paths.iter() {
-            write!(f, "{}\n", path.to_string2()).expect("Not able to write");
+            write!(f, "{}", path.to_string2()).expect("Not able to write");
         }
     }
 }
