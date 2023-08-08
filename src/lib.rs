@@ -834,6 +834,7 @@ impl  <T: OptFields>NCGfa <T> {
         self.nodes = ncgraph.nodes;
         self.edges = ncgraph.edges;
         self.paths = ncgraph.paths;
+        self.mapper = ncgraph.mapper;
 
     }
 

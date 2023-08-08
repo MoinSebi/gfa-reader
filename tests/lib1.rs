@@ -78,6 +78,27 @@ fn read_gfa_convert_nodes() {
 }
 
 
+
+
+#[test]
+fn read_gfa_convert_nodes2() {
+    eprintln!("Read gfa");
+    // Example data
+    let filename = "data/size5.gfa";
+    let mut graph: NCGfa<()> = NCGfa::new();
+    graph.parse_gfa_file_and_convert(filename, false);
+    assert_eq!(graph.nodes[9].opt, ());
+    assert_eq!(graph.nodes[1-1].id, 1);
+    assert_eq!(graph.nodes.len(), 26234);
+    assert_eq!(graph.nodes[0].id, 1);
+    assert_eq!(graph.paths[0].nodes[0], 4);
+    assert_eq!(graph.mapper.len(), 26234);
+
+
+}
+
+
+
 #[test]
 fn read_ncgfa_nodes() {
     eprintln!("Read gfa");
