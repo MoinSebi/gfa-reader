@@ -314,6 +314,28 @@ impl Walk {
         }
 }
 
+#[derive(Debug)]
+pub struct Jump{
+    pub from: String,
+    pub fromOrient: bool,
+    pub to: String,
+    pub toOrient: bool,
+    pub distance: String,
+}
+
+impl Jump {
+
+        /// Write path to string (GFA1 format)
+        /// v1.2
+        fn to_string(&self) -> String {
+            let a = format!("J\t{}\t{}\t{}\t{}\t{}\n", self.from, {if self.fromOrient{"+"} else {"-"}}, self.to, {if self.toOrient{"+"} else {"-"}}, self.distance);
+            a
+        }
+}
+
+
+
+
 
 
 
@@ -335,6 +357,7 @@ pub struct Gfa<T: OptFields>{
     pub edges: Option<Vec<Edge<T>>>,
     pub header: Header,
     pub walk: Vec<Walk>,
+    pub jumps: Vec<Jump>,
     pub string2index: HashMap<String, usize>,
 }
 
@@ -357,6 +380,7 @@ impl <T: OptFields> Gfa <T>{
             edges: None,
             header: Header{tag: "".to_string(), typ: "".to_string(), version_number: "".to_string()},
             walk: Vec::new(), // v1.1
+            jumps: Vec::new(), // v1.2
             string2index: HashMap::new(),
 
         }
