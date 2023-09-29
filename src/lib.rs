@@ -287,6 +287,34 @@ impl Path {
     }
 }
 
+#[derive(Debug)]
+/// Path features:
+/// - names
+/// - Directions of the nodes
+/// - Node names
+/// - Overlap
+///
+/// Comment: When there is not that many paths, the amount of memory for the overlap is not that much.
+pub struct Walk{
+    pub sampleId: String,
+    pub hapIndex: usize,
+    pub seqId: String,
+    pub seqstart: usize,
+    pub seqend: usize,
+    pub walk: String,
+}
+
+impl Walk {
+
+        /// Write path to string (GFA1 format)
+        /// v1.1
+        fn to_string(&self) -> String {
+            let a = format!("W\t{}\t{}\t{}\t{}\t{}\t{}\n", self.sampleId, self.hapIndex, self.seqId, self.seqstart, self.seqend, self.walk);
+            a
+        }
+}
+
+
 
 
 
@@ -306,6 +334,7 @@ pub struct Gfa<T: OptFields>{
     pub paths: Vec<Path>,
     pub edges: Option<Vec<Edge<T>>>,
     pub header: Header,
+    pub walk: Vec<Walk>,
     pub string2index: HashMap<String, usize>,
 }
 
@@ -327,6 +356,7 @@ impl <T: OptFields> Gfa <T>{
             paths: Vec::new(),
             edges: None,
             header: Header{tag: "".to_string(), typ: "".to_string(), version_number: "".to_string()},
+            walk: Vec::new(), // v1.1
             string2index: HashMap::new(),
 
         }
@@ -449,6 +479,15 @@ impl <T: OptFields> Gfa <T>{
                     "H" => {
                         let header = Header::from_string(&l);
                         self.header = header;
+                    }
+                    "W" => {
+                        let sampleId = a.next().unwrap().to_string();
+                        let hapIndex = a.next().unwrap().parse().unwrap();
+                        let seqId = a.next().unwrap().to_string();
+                        let seqstart = a.next().unwrap().parse().unwrap();
+                        let seqend = a.next().unwrap().parse().unwrap();
+                        let walk = a.next().unwrap().to_string();
+                        self.walk.push(Walk{sampleId, hapIndex, seqId, seqstart, seqend, walk});
                     }
                     _ => {
                     }
@@ -895,109 +934,6 @@ impl  <T: OptFields>NCGfa <T> {
         }
     }
 }
-
-
-//
-//     /// Mapper<&String, usize> -> Vec<&String>
-//     ///
-//     /// Reverse the mapper to vector
-//     pub fn reverse_mapper(&self) -> Vec<String>{
-//
-//         // When mapper ->
-//         let mut usize2id = vec!["".to_string(); self.nodes.len()+1];
-//
-//         if self.mapper.is_some(){
-//             for x in self.mapper.as_ref().unwrap().iter(){
-//                 usize2id[*x.1] = x.0.to_string();
-//             }
-//         } else {
-//             usize2id = self.nodes.iter().map(|x| x.id.to_string()).collect();
-//             usize2id.insert(0, "".to_string());
-//             }
-//
-//
-//         usize2id
-//     }
-//
-//     /// Get the nnode from the real node_id
-//     pub fn get_real_node(&self, node_id: &String) -> bool{
-//         if Some(self.mapper.as_ref().unwrap()) != None {
-//             let st = self.mapper.as_ref().unwrap().get(node_id).unwrap();
-//             let node = &self.nodes[*st].clone();
-//         } else {
-//             let node = &self.nodes[node_id.parse::<usize>().unwrap()];
-//         }
-//         false
-//     }
-//
-//     /// NGraph constructor when feature sizes are known
-//     /// Useful when converting from normal graph to this kind of graph.
-//     /// # Example
-//     ///
-//     /// ```
-//     /// use gfa_reader::NCGfa;
-//     /// let graph = NCGfa::with_capacity(10,10,10);
-//     ///
-//     /// ```
-//     pub fn with_capacity(nodes_number: usize, paths_number: usize, edge_number: usize) -> Self {
-//         Self {
-//             nodes: Vec::with_capacity(nodes_number),
-//             paths: Vec::with_capacity(paths_number),
-//             edges: Vec::with_capacity(edge_number),
-//             mapper: None,
-//         }
-//     }
-//
-//
-//     /// Convert normal gfa to NCGFA
-//     pub fn from_gfa_struct<T: OptFields, S: IsEdges>(&mut self, graph: &mut Gfa<T, S>) {
-//         let a = graph.check_nc();
-//         if a != None{
-//             let mut nodes: Vec<NNode> = Vec::with_capacity(a.unwrap().len());
-//             graph.nodes.iter().for_each(|x| nodes[x.id.parse::<usize>().unwrap()] = NNode{id: x.id.parse::<u32>().unwrap(), seq: x.seq.clone()});
-//             self.edges = graph.edges.iter().map(|x| NEdge{from: x.from.parse().unwrap(), from_dir: x.from_dir, to: x.to.parse().unwrap(), to_dir: x.to_dir}).collect();
-//             self.paths = graph.paths.iter().map(|x| NPath{name: x.name.clone(), dir: x.dir.clone(), nodes: x.nodes.iter().map(|y| y.parse().unwrap()).collect()}).collect();
-//         } else {
-//             let a = self.make_mapper(graph);
-//             self.convert_with_mapper(a, graph);
-//         }
-//     }
-//
-//
-
-//
-//
-
-//
-// /// Check if a file has compact and numeric nodes
-// pub fn read_nodes(filename: &str) -> bool{
-//     if file_path::new(filename).exists() {
-//         let mut file = File::open(filename).expect("ERROR: CAN NOT READ FILE\n");
-//         let mut contents = String::new();
-//         file.read_to_string(&mut contents).unwrap();
-//
-//         // path name -> path_number
-//         let mut nodes = Vec::new();
-//
-//         for line in contents.lines() {
-//             let line_split: Vec<&str> = line.split("\t").collect();
-//             match line_split[0] {
-//                 "S" => {
-//                     nodes.push(line_split[1]);
-//                 }
-//                 _ => ()
-//             }
-//         }
-//         let is_digit = vec_is_digit(&nodes);
-//         if is_digit {
-//             let numeric_nodes = create_sort_numeric(&nodes);
-//             let compact = vec_is_compact(&numeric_nodes);
-//             return compact
-//         }
-//         return true
-//     }
-//     return false
-// }
 
 /// Does this vector contain only digits
 pub fn vec_is_digit(nodes: &Vec<&str>) -> bool{
