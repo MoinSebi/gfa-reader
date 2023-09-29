@@ -315,21 +315,28 @@ impl Walk {
 }
 
 #[derive(Debug)]
-pub struct Jump{
+pub struct Jump<T: OptFields>{
     pub from: String,
     pub fromOrient: bool,
     pub to: String,
     pub toOrient: bool,
     pub distance: String,
+    pub opt: T,
 }
 
-impl Jump {
+impl <T: OptFields>Jump<T>  {
 
         /// Write path to string (GFA1 format)
         /// v1.2
         fn to_string(&self) -> String {
             let a = format!("J\t{}\t{}\t{}\t{}\t{}\n", self.from, {if self.fromOrient{"+"} else {"-"}}, self.to, {if self.toOrient{"+"} else {"-"}}, self.distance);
-            a
+            if self.opt.fields().len() > 0 {
+                let b: Vec<String> = self.opt.fields().iter().map(|a| a.to_string1()).collect();
+                let c = b.join("\t");
+                format!("{}{}\n", a, c)
+            } else {
+                a
+            }
         }
 }
 
@@ -357,7 +364,7 @@ pub struct Gfa<T: OptFields>{
     pub edges: Option<Vec<Edge<T>>>,
     pub header: Header,
     pub walk: Vec<Walk>,
-    pub jumps: Vec<Jump>,
+    pub jumps: Vec<Jump<T>>,
     pub string2index: HashMap<String, usize>,
 }
 
@@ -512,6 +519,14 @@ impl <T: OptFields> Gfa <T>{
                         let seqend = a.next().unwrap().parse().unwrap();
                         let walk = a.next().unwrap().to_string();
                         self.walk.push(Walk{sampleId, hapIndex, seqId, seqstart, seqend, walk});
+                    }
+                    "J" => {
+                        let from = a.next().unwrap().to_string();
+                        let fromOrient = if a.next().unwrap() == "+" { !false } else { !true };
+                        let to = a.next().unwrap().to_string();
+                        let toOrient = if a.next().unwrap() == "+" { !false } else { !true };
+                        let distance = a.next().unwrap().to_string();
+                        self.jumps.push(Jump{from, fromOrient, to, toOrient, distance, opt: T::parse(a)});
                     }
                     _ => {
                     }
