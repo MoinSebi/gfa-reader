@@ -314,6 +314,92 @@ impl Walk {
         }
 }
 
+
+#[derive(Debug)]
+pub struct Fragment<T: OptFields>{
+    pub sampleId: String,
+    pub external_ref: usize,
+    pub sbeg_pos: usize,
+    pub send_pos: usize,
+    pub fbeg_pos: usize,
+    pub fend_pos: usize,
+    pub alignment: String,
+    pub opt: T,
+}
+
+impl <T: OptFields>Fragment<T>{
+    /// Write path to string (GFA1 format)
+    /// v2
+    fn to_string(&self) -> String {
+        let a = format!("F\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n", self.sampleId, self.external_ref, self.sbeg_pos, self.send_pos, self.fbeg_pos, self.fend_pos, self.alignment);
+        if self.opt.fields().len() > 0 {
+            let b: Vec<String> = self.opt.fields().iter().map(|a| a.to_string1()).collect();
+            let c = b.join("\t");
+            format!("{}{}\n", a, c)
+        } else {
+            a
+        }
+    }
+}
+
+
+/// Ordered and unordered groups
+/// v2.0
+pub struct group{
+    pub is_ordered: bool,
+    pub name: String,
+    pub nodes: Vec<String>,
+    pub direction: Vec<bool>,
+}
+
+impl group{
+
+    /// Write path to string (GFA2 format)
+    pub fn to_string(&self) -> String{
+        let mut a = format!("{}\t", {if self.is_ordered{"O".to_string()} else {"U".to_string()}});
+        let a = format!("{}\t", self.name);
+        if self.is_ordered {
+            let f1: Vec<String> = self.nodes.iter().zip(&self.direction).map(|n| format!("{}{}", n.0, {if *n.1{"+".to_string()} else {"-".to_string()}})).collect();
+            let f2 = f1.join("\t");
+            format!("{}\t{}\n", a, f2)
+        } else {
+            let f1: Vec<String> = self.nodes.iter().map(|n| format!("{}", n)).collect();
+            let f2 = f1.join("\t");
+            format!("{}\t{}\n", a, f2)
+        }
+    }
+}
+
+
+
+
+pub struct gap<T: OptFields>{
+    pub name: String,
+    pub sid1: String,
+    pub sid1_ref: bool,
+    pub sid2: String,
+    pub sid2_ref: bool,
+    pub dist: usize,
+    pub tag: T,
+}
+
+
+impl <T: OptFields>gap<T> {
+
+    /// Write path to string (GFA2 format)
+    fn to_string(&self) -> String {
+        let a = format!("G\t{}\t{}{}\t{}{}\t{}\n", self.name, self.sid1, {if self.sid1_ref{"+"} else {"-"}}, self.sid2, {if self.sid2_ref{"+"} else {"-"}}, self.dist);
+        if self.tag.fields().len() > 0 {
+            let b: Vec<String> = self.tag.fields().iter().map(|a| a.to_string1()).collect();
+            let c = b.join("\t");
+            format!("{}{}\n", a, c)
+        } else {
+            a
+        }
+    }
+    
+}
+
 #[derive(Debug)]
 pub struct Jump<T: OptFields>{
     pub from: String,
