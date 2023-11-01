@@ -61,14 +61,14 @@ pub trait OptFields: Sized + Default + Clone {
     /// replaced by an iterator or something else in the future
     fn fields(&self) -> &[OptElem];
 
-    /// Given an iterator over bytestrings, each expected to hold one
+    /// Given an iterator over a split, each expected to hold one
     /// optional field (in the <TAG>:<TYPE>:<VALUE> format), parse
-    /// them as optional fields to create a collection. Returns `Self`
-    /// rather than `Option<Self>` for now, but this may be changed to
-    /// become fallible in the future.
+    /// them as optional fields to create a collection.
     fn parse(input: Split<&str>) -> Self;
 
     fn new() -> Self;
+
+    /// Iterator of the collection
     fn iter(&self) -> std::slice::Iter<OptElem> {
         self.iter()
     }
@@ -99,10 +99,7 @@ impl OptFields for () {
 }
 
 
-/// Stores all the optional fields in a vector. `get_field` simply
-/// uses std::iter::Iterator::find(), but as there are only a
-/// relatively small number of optional fields in practice, it should
-/// be efficient enough.
+/// Stores all the optional fields in a vector.
 impl OptFields for Vec<OptElem> {
     fn fields(&self) -> &[OptElem] {
         self.as_slice()
@@ -342,7 +339,7 @@ impl <T: OptFields>Fragment<T>{
     }
 }
 
-
+#[derive(Debug)]
 /// Ordered and unordered groups
 /// v2.0
 pub struct group{
@@ -354,10 +351,10 @@ pub struct group{
 
 impl group{
 
-    /// Write path to string (GFA2 format)
-    pub fn to_string(&self) -> String{
+    /// Write group to string (GFA2 format)
+    pub fn to_string2(&self) -> String{
         let mut a = format!("{}\t", {if self.is_ordered{"O".to_string()} else {"U".to_string()}});
-        let a = format!("{}\t", self.name);
+        a = format!("{}\t{}", a, self.name);
         if self.is_ordered {
             let f1: Vec<String> = self.nodes.iter().zip(&self.direction).map(|n| format!("{}{}", n.0, {if *n.1{"+".to_string()} else {"-".to_string()}})).collect();
             let f2 = f1.join("\t");
@@ -366,6 +363,20 @@ impl group{
             let f1: Vec<String> = self.nodes.iter().map(|n| format!("{}", n)).collect();
             let f2 = f1.join("\t");
             format!("{}\t{}\n", a, f2)
+        }
+    }
+
+    /// Write group to string (GFA1 format)
+    /// P line in GFA1
+    pub fn to_string(&self) -> String {
+        let mut a = format!("{}\t", "P");
+        a = format!("{}\t{}", a, self.name);
+        if self.is_ordered {
+            let f1: Vec<String> = self.nodes.iter().zip(&self.direction).map(|n| format!("{}{}", n.0, {if *n.1{"+".to_string()} else {"-".to_string()}})).collect();
+            let f2 = f1.join(",");
+            format!("{}\t{}\n", a, f2)
+        } else  {
+            format!("{}\n", a)
         }
     }
 }
@@ -445,12 +456,20 @@ impl <T: OptFields>Jump<T>  {
 /// memory consumption, since most node ids are stored at Strings which are a minimum of 24 bytes.
 /// This is only maintained, since it is not of further use in any of my projects.
 pub struct Gfa<T: OptFields>{
+
+    // GFA 1.0 data
+    pub header: Header,
     pub nodes: Vec<Node<T>>,
     pub paths: Vec<Path>,
     pub edges: Option<Vec<Edge<T>>>,
-    pub header: Header,
+
+    // GFA 1.1/1.2 data
     pub walk: Vec<Walk>,
     pub jumps: Vec<Jump<T>>,
+
+    // GFA 2.0 data
+    pub fragments: Vec<Fragment<T>>,
+    pub groups: Vec<group>,
     pub string2index: HashMap<String, usize>,
 }
 
@@ -475,6 +494,8 @@ impl <T: OptFields> Gfa <T>{
             walk: Vec::new(), // v1.1
             jumps: Vec::new(), // v1.2
             string2index: HashMap::new(),
+            fragments: Vec::new(), // v2.0
+            groups: Vec::new(), // v2.0
 
         }
     }
@@ -1002,7 +1023,8 @@ impl  <T: OptFields>NCGfa <T> {
 
     }
 
-    /// Create a mapper
+
+    /// Creat a map from string node id -> numeric node id
     pub fn make_mapper(&mut self, graph: & Gfa<T>) -> HashMap<String, usize> {
         let mut f = graph.nodes.iter().map(|x| x.id.clone()).collect::<Vec<String>>();
         f.sort_by_key(|digit| digit.parse::<u32>().unwrap());
@@ -1014,6 +1036,8 @@ impl  <T: OptFields>NCGfa <T> {
     }
 
     /// Convert the "old" graph with the mapper
+    ///
+    /// Using the mapper from "make_mapper"
     pub fn convert_with_mapper(&mut self, mapper: HashMap<String, usize>, graph: &Gfa<T>){
         let mut nodes: Vec<NCNode<T>> = graph.nodes.iter().map(|x| NCNode{id: mapper.get(&x.id).unwrap().clone() as u32, seq: x.seq.clone(), opt: x.opt.clone()}).collect();
         nodes.sort_by_key(|a| a.id);
@@ -1033,6 +1057,7 @@ impl  <T: OptFields>NCGfa <T> {
 
     }
 
+    /// Get original (string) node
     pub fn get_old_node(&self, node_id: &usize) -> &String{
         &self.mapper[node_id-1]
     }
@@ -1058,6 +1083,25 @@ impl  <T: OptFields>NCGfa <T> {
             write!(f, "{}", path.to_string2()).expect("Not able to write");
         }
     }
+
+    /// Check if the graph is really numeric
+    pub fn check_numeric(&self) -> bool{
+        for (i, x) in self.mapper.iter().enumerate(){
+            if (i+1).to_string() != *x{
+                return false
+            }
+        }
+        return true
+    }
+
+    /// Remove the mapper if not needed
+    pub fn remove_mapper(&mut self){
+        if self.check_numeric(){
+            self.mapper = Vec::new();
+        }
+    }
+
+
 }
 
 /// Does this vector contain only digits
@@ -1087,12 +1131,6 @@ pub fn create_sort_numeric(nodes: &Vec<&str>) -> Vec<usize> {
 pub fn vec_is_compact(numeric_nodes: &Vec<usize>) -> bool{
     numeric_nodes.windows(2).all(|pair| pair[1] == &pair[0] + 1)
 }
-
-
-
-
-// Have a collection of intervals and query and find those intervals that overlap with the query. Use crates if possible. Create a function to do this
-
 
 
 

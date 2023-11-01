@@ -125,6 +125,18 @@ fn convert_gfa_ncgfa(){
 }
 
 
+#[test]
+fn convert_gfa_ncgfa2(){
+    eprintln!("Read gfa");
+    // Example data
+    let filename = "data/size5.gfa";
+    let mut graph: Gfa<()> = Gfa::new();
+    graph.parse_gfa_file(filename, false);
+    let a = graph.convert_to_ncgraph(&graph, true);
+    assert_eq!(true, a.check_numeric());
+}
+
+
 
 
 
