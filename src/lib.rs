@@ -740,7 +740,6 @@ impl <'a, T: IsPath> GraphWrapper<'a, T>{
         }
         self.path2genome = name2group;
         self.genomes = name2path_value;
-        assert_eq!(0,1);
 
     }
 
