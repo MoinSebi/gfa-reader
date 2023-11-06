@@ -715,7 +715,10 @@ impl <'a, T: IsPath> GraphWrapper<'a, T>{
         } else {
             for path in paths.iter() {
                 let name_split: Vec<&str> = path.get_name().split(del).collect();
-                let name_first = name_split[0].to_string() + name_split[1];
+                let mut name_first = name_split[0].to_string();
+                if name_split.len() > 1{
+                    name_first = name_split[0].to_string() + name_split[1];
+                }
                 if name2pathvec.contains_key(&name_first.to_owned().clone()) {
                     name2pathvec.get_mut(&name_first.to_owned().clone()).unwrap().push(path)
                 } else {
