@@ -717,7 +717,7 @@ impl <'a, T: IsPath> GraphWrapper<'a, T>{
                 let name_split: Vec<&str> = path.get_name().split(del).collect();
                 let mut name_first = name_split[0].to_string();
                 if name_split.len() > 1{
-                    name_first = name_split[0].to_string() + name_split[1];
+                    name_first = name_split[0].to_string() + del + name_split[1];
                 }
                 if name2pathvec.contains_key(&name_first.to_owned().clone()) {
                     name2pathvec.get_mut(&name_first.to_owned().clone()).unwrap().push(path)
@@ -740,7 +740,10 @@ impl <'a, T: IsPath> GraphWrapper<'a, T>{
         }
         self.path2genome = name2group;
         self.genomes = name2path_value;
+        assert_eq!(0,1);
+
     }
+
 }
 
 

@@ -136,6 +136,18 @@ fn convert_gfa_ncgfa2(){
     assert_eq!(true, a.check_numeric());
 }
 
+#[test]
+fn convert_gfa_ncgfa23(){
+    eprintln!("Read gfa2");
+    // Example data
+    let filename = "../gfastats/data/example_data/testGraph_complex.gfa";
+    let mut graph: Gfa<()> = Gfa::new();
+    graph.parse_gfa_file(filename, false);
+    let a = graph.convert_to_ncgraph(&graph, true);
+    let mut wrapper: GraphWrapper<NCPath> = GraphWrapper::new();
+    wrapper.from_gfa(&a.paths, "#");
+}
+
 
 
 
