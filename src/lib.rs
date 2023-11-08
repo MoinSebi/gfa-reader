@@ -908,7 +908,7 @@ impl  <T: OptFields>NCGfa <T> {
             },
             nodes: Vec::new(),
             paths: Vec::new(),
-            edges: None,
+            edges: Option::None,
             mapper: Vec::new(),
         }
     }
@@ -1000,6 +1000,7 @@ impl  <T: OptFields>NCGfa <T> {
             }
             nodes.sort_by_key(|a| a.id);
             self.nodes.extend(nodes);
+            self.edges = Some(edges);
 
         }
 
