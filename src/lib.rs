@@ -746,6 +746,38 @@ impl <'a, T: IsPath> GraphWrapper<'a, T>{
 }
 
 
+/// Haplotype representation in GFA
+///
+/// Several multi-path (wrapper) can be part of one genome, representing multiple haplotypes
+pub struct Haplotypes{
+    pub genome2haplotype: HashMap<String, Vec<String>>,
+
+}
+
+impl Haplotypes{
+
+
+    pub fn from_wrapper(wrapper: & GraphWrapper<NCPath>, sep: &str) -> Haplotypes{
+        let mut g2h_temp: HashMap<String, Vec<String>> = HashMap::new();
+        for (index, data) in wrapper.genomes.iter().enumerate(){
+            let wrapper_name_split: Vec<String> = data.0.split(sep).map(|s| s.to_string()).collect();
+            let genome_name = &wrapper_name_split[0];
+
+            if g2h_temp.contains_key(genome_name){
+                g2h_temp.get_mut(genome_name).unwrap().push(data.0.clone());
+            }
+            else {
+                g2h_temp.insert(genome_name.clone(), vec![data.0.clone()]);
+            }
+
+        }
+        Haplotypes{
+            genome2haplotype: g2h_temp,
+        }
+    }
+}
+
+
 //-------------------------------------------------------------------------------------------------------------------------------------------------
 
 
