@@ -683,99 +683,125 @@ impl <T: OptFields> Gfa <T>{
 
 
 
-
-/// GFA wrapper
+/// PanSN-spec path data structure
 ///
-/// This is important for PanSN graphs
-/// Since the node space is the same, only path need to be merged (which can be done easily)
-pub struct GraphWrapper<'a, T: IsPath>{
-    pub genomes: Vec<(String, Vec<&'a T>)>,
-    pub path2genome: HashMap<&'a String, String>
+/// PanSN-spec
+/// [sample_name][delim][haplotype_id][delim][contig_or_scaffold_name]
+pub struct Pansn<'a, T: IsPath>{
+    pub genomes: Vec<Sample<'a, T>>,
 }
 
+pub struct Sample<'a, T: IsPath>{
+    pub name: String,
+    pub haplotypes: Vec<Haplotype<'a, T>>
 
-impl <'a, T: IsPath> GraphWrapper<'a, T>{
-    pub fn new() -> Self{
-        Self{
-            genomes: Vec::new(),
-            path2genome: HashMap::new(),
-        }
-    }
+}
 
+/// PanSN-spec haplotype
+///
+/// Merging multiple paths together
+pub struct Haplotype<'a, T: IsPath> {
+    pub name: String,
+    pub paths: Vec<&'a T>
+}
 
-    /// GFA -> Wrapper
-    /// If delimiter == " " (nothing)
-    ///     -> No merging
-    pub fn from_gfa(& mut self, paths: &'a Vec<T>, del: &str) {
-        let mut name2pathvec: HashMap<String, Vec<&'a T>> = HashMap::new();
+impl <'a, T: IsPath> Pansn<'a, T> {
+
+    /// Create Pansn from a list of paths
+    pub fn from_graph(paths: &'a Vec<T>, del: &str) -> Self{
+        let mut genomes: Vec<Sample<'a, T>> = Vec::new();
+
+        // If no del -> one path is one haplotype is one path
         if del == " " {
             for path in paths.iter() {
-                name2pathvec.insert(path.get_name().clone(), vec![path]);
+                genomes.push(Sample {name: path.get_name().to_string(), haplotypes: vec![Haplotype{name: path.get_name().to_string(), paths: vec![path]}]})
             }
         } else {
             for path in paths.iter() {
                 let name_split: Vec<&str> = path.get_name().split(del).collect();
-                let mut name_first = name_split[0].to_string();
+                let mut genome;
+                let mut haplotype;
                 if name_split.len() > 1{
-                    name_first = name_split[0].to_string() + del + name_split[1];
-                }
-                if name2pathvec.contains_key(&name_first.to_owned().clone()) {
-                    name2pathvec.get_mut(&name_first.to_owned().clone()).unwrap().push(path)
+                    genome = name_split[0].to_string();
+                    haplotype = name_split[1].to_string();
                 } else {
-                    name2pathvec.insert(name_first.to_owned().clone(), vec![path]);
+                    panic!("No Pansn, remove sep or adjust gfa")
                 }
-            }
-        }
-        let mut name2path_value: Vec<(String, Vec<&'a T>)> = Vec::new();
-        let mut path_names: Vec<String> = name2pathvec.keys().cloned().collect();
-        path_names.sort();
-        for path_name in path_names.iter(){
-            name2path_value.push((path_name.clone(), name2pathvec.get(path_name).unwrap().clone()));
-        }
-        let mut name2group = HashMap::new();
-        for (name, group) in name2path_value.iter(){
-            for path in group.iter(){
-                name2group.insert(path.get_name(), name.to_owned());
-            }
-        }
-        self.path2genome = name2group;
-        self.genomes = name2path_value;
+                // Gibt es schon so ein Genome?
+                if let Some((index1, _)) = genomes.iter().enumerate().find(|(_, item)| item.name == genome) {
+                    let mut genome = &mut genomes[index1];
+                    // Gibt es schon ein Haplotype
+                    if let Some((index2, _)) = genome.haplotypes.iter().enumerate().find(|(_, item)| item.name == haplotype) {
+                        let haplo = &mut genome.haplotypes[index2];
+                        haplo.paths.push(path);
+                    } else {
+                        let haplo = Haplotype{name: haplotype, paths: vec![path]};
+                        genome.haplotypes.push(haplo);
 
+                    }
+                } else {
+                    let haplo = Haplotype{name: haplotype, paths: vec![path]};
+                    let genome = Sample {name: genome, haplotypes: vec![haplo]};
+                    genomes.push(genome);
+                    println!("Did not find the specific string.");
+                }
+
+            }
+        }
+        Pansn {
+            genomes: genomes,
+        }
+    }
+
+    pub fn get_haplo_path(&self) -> Vec<(String, Vec<&'a T>)>{
+        let mut result = Vec::new();
+
+        for x in self.genomes.iter(){
+
+            for y in x.haplotypes.iter(){
+
+                let mut kk: Vec<&T> = y.paths.iter().map(|i| i.clone()).collect();
+                result.push((x.name.clone() + "#" + &y.name, kk));
+            }
+        }
+
+        result
+    }
+
+    pub fn get_path_genome(&self) -> Vec<(String, Vec<&'a T>)>{
+        let mut result = Vec::new();
+
+        for x in self.genomes.iter(){
+
+            let mut aa = Vec::new();
+            for y in x.haplotypes.iter(){
+
+                let mut kk: Vec<&T> = y.paths.iter().map(|i| i.clone()).collect();
+                aa.extend(kk);
+            }
+            result.push((x.name.clone(), aa));
+        }
+
+        result
+    }
+
+    pub fn get_paths_direct(&self) -> Vec<(String, Vec<&'a T>)>{
+        let mut result = Vec::new();
+
+        for x in self.genomes.iter(){
+
+            for y in x.haplotypes.iter(){
+
+                y.paths.iter().for_each(|i| result.push((i.get_name().to_string(), vec![i.clone()])))
+            }
+        }
+        return result
     }
 
 }
 
 
-/// Haplotype representation in GFA
-///
-/// Several multi-path (wrapper) can be part of one genome, representing multiple haplotypes
-pub struct Haplotypes{
-    pub genome2haplotype: HashMap<String, Vec<String>>,
 
-}
-
-impl Haplotypes{
-
-
-    pub fn from_wrapper(wrapper: & GraphWrapper<NCPath>, sep: &str) -> Haplotypes{
-        let mut g2h_temp: HashMap<String, Vec<String>> = HashMap::new();
-        for (index, data) in wrapper.genomes.iter().enumerate(){
-            let wrapper_name_split: Vec<String> = data.0.split(sep).map(|s| s.to_string()).collect();
-            let genome_name = &wrapper_name_split[0];
-
-            if g2h_temp.contains_key(genome_name){
-                g2h_temp.get_mut(genome_name).unwrap().push(data.0.clone());
-            }
-            else {
-                g2h_temp.insert(genome_name.clone(), vec![data.0.clone()]);
-            }
-
-        }
-        Haplotypes{
-            genome2haplotype: g2h_temp,
-        }
-    }
-}
 
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------

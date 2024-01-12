@@ -1,4 +1,4 @@
-use gfa_reader::{Edge, Gfa, GraphWrapper, NCGfa, NCPath, Path};
+use gfa_reader::{Edge, Gfa, NCGfa, NCPath, Pansn, Path};
 
 #[test]
 /// Check full header
@@ -52,8 +52,7 @@ fn read_gfa_nodes2() {
     let filename = "data/size5.gfa";
     let mut graph: Gfa<()> = Gfa::new();
     graph.parse_gfa_file(filename, false);
-    let mut gra: GraphWrapper<Path> = GraphWrapper::new();
-    gra.from_gfa(&graph.paths, " ");
+    let mut gra: Pansn<Path> = Pansn::from_graph(&graph.paths, " ");
     assert_eq!(gra.genomes.len(), 5);
 }
 
@@ -144,8 +143,7 @@ fn convert_gfa_ncgfa23(){
     let mut graph: Gfa<()> = Gfa::new();
     graph.parse_gfa_file(filename, false);
     let a = graph.convert_to_ncgraph(&graph, true);
-    let mut wrapper: GraphWrapper<NCPath> = GraphWrapper::new();
-    wrapper.from_gfa(&a.paths, "#");
+    let mut wrapper: Pansn<NCPath> = Pansn::from_graph(&a.paths, "#");
 }
 
 

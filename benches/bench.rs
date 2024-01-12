@@ -17,25 +17,6 @@ fn ngfa_normal(filename: &str){
     let f = _intervals.parse_gfa_file_direct(filename, true);
     //sort_vector(&mut intervals);
 }
-//
-// /// Read graph and check nodes
-// fn test_nodes(filename: &str){
-//     let mut nodes = read_nodes(filename);
-//     let mut _intervals = NCGfa::new();
-//     let f = _intervals.parse_gfa_file(filename);
-// }
-//
-// /// Read graph and convert to NC graph
-// fn gfa_to_ncgfa(filename: &str){
-//     let mut graph: Gfa<()> = Gfa::new();
-//     let mut graph2: NCGfa = NCGfa::new();
-//
-//     graph.parse_gfa_file(filename);
-//     let f = graph2.make_mapper(&mut graph);
-//     graph2.convert_with_mapper(f, &graph);
-//
-//     //sort_vector(&mut intervals);
-// }
 
 
 
@@ -49,9 +30,6 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     group.bench_function("Gfa", |b| b.iter(|| gfa_normal(filename)));
     group.bench_function("ncgfa", |b| b.iter(|| ngfa_normal(filename)));
-    //
-    // group.bench_function("gfa_ncgfa", |b| b.iter(|| gfa_to_ncgfa(filename)));
-    // group.bench_function("test_nodes", |b| b.iter(|| test_nodes(filename)));
 
 }
 
