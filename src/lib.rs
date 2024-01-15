@@ -1250,7 +1250,7 @@ fn get_version(file_path: &str) -> f32{
 
 
     // Read the first line of the file
-    let first_line  = reader.lines().next().unwrap().unwrap();;
+    let first_line  = reader.lines().next().unwrap().unwrap();
     let line = first_line.split_whitespace().nth(1).unwrap();
     let version_number = line.split(':').nth(2).unwrap().to_string();
     return version_number.parse::<f32>().unwrap();
