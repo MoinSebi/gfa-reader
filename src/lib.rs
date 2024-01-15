@@ -294,7 +294,8 @@ pub struct Walk{
     pub seq_id: String,
     pub seq_start: usize,
     pub seq_end: usize,
-    pub walk: String,
+    pub walk_segments: Vec<String>,
+    pub walk_dir: Vec<bool>,
 }
 
 impl Walk {
@@ -303,7 +304,10 @@ impl Walk {
         /// Write path to string (GFA1 format)
         /// v1.1
         fn to_string(&self) -> String {
-            let a = format!("W\t{}\t{}\t{}\t{}\t{}\t{}\n", self.sample_id, self.hap_index, self.seq_id, self.seq_start, self.seq_end, self.walk);
+            let a = format!("W\t{}\t{}\t{}\t{}\t{}", self.sample_id, self.hap_index, self.seq_id, self.seq_start, self.seq_end);
+            let f1: Vec<String> = self.walk_segments.iter().zip(&self.walk_dir).map(|n| format!("{}{}", n.0, {if *n.1{">".to_string()} else {"<".to_string()}})).collect();
+            let f2 = f1.join(",");
+            let a = format!("{}\t{}\n", a, f2);
             a
         }
 }
@@ -327,7 +331,7 @@ pub struct Fragment<T: OptFields>{
 impl <T: OptFields>Fragment<T>{
 
     #[allow(dead_code)]
-    /// Write path to string (GFA1 format)
+    /// Write fragment to string (GFA1 format)
     /// v2
     fn to_string(&self) -> String {
         let a = format!("F\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n", self.sample_id, self.external_ref, self.seg_begin, self.seg_end, self.frag_begin, self.frag_end, self.alignment);
@@ -709,7 +713,9 @@ impl <T: OptFields> Gfa<T>{
                         let seq_start = a.next().unwrap().parse().unwrap();
                         let seq_end = a.next().unwrap().parse().unwrap();
                         let walk = a.next().unwrap().to_string();
-                        self.walk.push(Walk{ sample_id, hap_index, seq_id, seq_start, seq_end, walk});
+                        let dirs: Vec<bool> = walk.split(",").map(|d| if &d[d.len() - 1..] == ">" { !false } else { !true }).collect();
+                        let node_id: Vec<String> = walk.split(",").map(|d| d[..d.len() - 1].parse().unwrap()).collect();
+                        self.walk.push(Walk{ sample_id, hap_index, seq_id, seq_start, seq_end, walk_segments: node_id, walk_dir: dirs});
                     }
                     "J" => {
                         let from = a.next().unwrap().to_string();
