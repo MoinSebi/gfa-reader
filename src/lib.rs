@@ -1349,7 +1349,9 @@ impl <'a, T: IsPath> Pansn<'a, T> {
                     genome = name_split[0].to_string();
                     haplotype = name_split[1].to_string();
                 } else {
+                    genomes.push(Sample {name: path.get_name().to_string(), haplotypes: vec![Haplotype{name: path.get_name().to_string(), paths: vec![path]}]});
                     panic!("No Pansn, remove sep or adjust gfa")
+
                 }
                 // Gibt es schon so ein Genome?
                 if let Some((index1, _)) = genomes.iter().enumerate().find(|(_, item)| item.name == genome) {
