@@ -136,3 +136,15 @@ fn convert_gfa_ncgfa2(){
 }
 
 
+#[test]
+fn convert_gfa_ncgfa3() {
+    eprintln!("Read gfa");
+    // Example data
+    let filename = "data/size5.gfa";
+    let mut graph: NCGfa<()> = NCGfa::new();
+    graph.parse_gfa_file_direct(filename, false);
+
+}
+
+
+
