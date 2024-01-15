@@ -1,4 +1,4 @@
-use gfa_reader::{Edge, Gfa, NCGfa, NCPath, Pansn, Path};
+use gfa_reader::{Link, Gfa, NCGfa, NCPath, Pansn, Path};
 
 #[test]
 /// Check full header
@@ -22,13 +22,13 @@ fn read_gfa_edges() {
     let filename = "data/size5.gfa";
     let mut graph: Gfa<()> = Gfa::new();
     graph.parse_gfa_file(filename, true);
-    assert_eq!(&graph.edges.as_ref().unwrap().len(), &35381);
-    assert_eq!(&graph.edges.clone().unwrap()[0],
-               &Edge { from: "1".to_string(), from_dir: true, to_dir: true, to: "78".to_string(), overlap: "0M".to_string(), opt: () });
+    assert_eq!(&graph.links.as_ref().unwrap().len(), &35381);
+    assert_eq!(&graph.links.clone().unwrap()[0],
+               &Link { from: "1".to_string(), from_dir: true, to_dir: true, to: "78".to_string(), overlap: "0M".to_string(), opt: () });
 
     let mut graph: Gfa<()> = Gfa::new();
     graph.parse_gfa_file(filename, false);
-    assert_eq!(graph.edges, None);
+    assert_eq!(graph.links, None);
 }
 
 
@@ -39,8 +39,8 @@ fn read_gfa_nodes() {
     let filename = "data/size5.gfa";
     let mut graph: Gfa<()> = Gfa::new();
     graph.parse_gfa_file(filename, false);
-    assert_eq!(graph.nodes[9].opt, ());
-    assert_eq!(graph.nodes.len(), 26234);
+    assert_eq!(graph.segments[9].opt, ());
+    assert_eq!(graph.segments.len(), 26234);
     assert_eq!(graph.paths[0].nodes[0], "4".to_string());
 }
 
@@ -52,7 +52,7 @@ fn read_gfa_nodes2() {
     let filename = "data/size5.gfa";
     let mut graph: Gfa<()> = Gfa::new();
     graph.parse_gfa_file(filename, false);
-    let mut gra: Pansn<Path> = Pansn::from_graph(&graph.paths, " ");
+    let gra: Pansn<Path> = Pansn::from_graph(&graph.paths, " ");
     assert_eq!(gra.genomes.len(), 5);
 }
 
@@ -116,10 +116,10 @@ fn convert_gfa_ncgfa(){
     let filename = "data/size5.gfa";
     let mut graph: Gfa<()> = Gfa::new();
     graph.parse_gfa_file(filename, false);
-    let a = graph.convert_to_ncgraph(&graph, true);
-    assert_eq!(graph.nodes[1].seq, a.nodes[1].seq);
-    assert_eq!(graph.nodes[1].opt, a.nodes[1].opt);
-    assert_eq!(graph.nodes[1].id, a.nodes[1].id.to_string());
+    let a = graph.convert_to_ncgraph(&graph);
+    assert_eq!(graph.segments[1].sequence, a.nodes[1].seq);
+    assert_eq!(graph.segments[1].opt, a.nodes[1].opt);
+    assert_eq!(graph.segments[1].name, a.nodes[1].id.to_string());
     assert_eq!(a.nodes[1].id, 2)
 }
 
@@ -131,64 +131,8 @@ fn convert_gfa_ncgfa2(){
     let filename = "data/size5.gfa";
     let mut graph: Gfa<()> = Gfa::new();
     graph.parse_gfa_file(filename, false);
-    let a = graph.convert_to_ncgraph(&graph, true);
+    let a = graph.convert_to_ncgraph(&graph);
     assert_eq!(true, a.check_numeric());
 }
 
-#[test]
-fn convert_gfa_ncgfa23(){
-    eprintln!("Read gfa2");
-    // Example data
-    let filename = "../gfastats/data/example_data/testGraph_complex.gfa";
-    let mut graph: Gfa<()> = Gfa::new();
-    graph.parse_gfa_file(filename, false);
-    let a = graph.convert_to_ncgraph(&graph, true);
-    let mut wrapper: Pansn<NCPath> = Pansn::from_graph(&a.paths, "#");
-}
 
-
-
-
-
-
-//
-//
-//
-// #[test]
-// fn read_gfa() {
-//     eprintln!("Read gfa");
-//     // Example data
-//     let filename = "data/size5.gfa";
-//     let mut graph: Gfa<()> = Gfa::new();
-//     graph.parse_gfa_file(filename);
-//     assert_eq!(graph.nodes[9].seq, "C");
-//     assert_eq!(graph.nodes[8].opt, ());
-//
-//
-// }
-//
-//
-// #[test]
-// fn read_ncgfa() {
-//     let filename = "data/size5.gfa";
-//     let mut graph: NCGfa = NCGfa::new();
-//     graph.parse_gfa_file(filename);
-//     assert_eq!(graph.nodes.get(8).unwrap().seq, "C");
-//     assert_eq!(graph.nodes.get(8).unwrap().id, 8);
-//     assert_eq!(graph.nodes.get(graph.nodes.len()-1).unwrap().id as usize, graph.nodes.len()-1);
-//
-// }
-//
-//
-// fn read_gfa_convert_ncgfa() {
-//     let filename = "data/size5.gfa";
-//     let mut graph: Gfa<()> = Gfa::new();
-//     graph.parse_gfa_file(filename);
-//     let mut graph2: NCGfa = NCGfa::new();
-//     let mapper = graph2.make_mapper(&mut graph);
-//     graph2.convert_with_mapper(mapper, &graph);
-//     assert_eq!(graph2.nodes.get(7).unwrap().seq, "C");
-//     assert_eq!(graph2.nodes.get(8).unwrap().id, 8);
-//     assert_eq!(graph2.nodes.get(graph2.nodes.len()-1).unwrap().id as usize, graph2.nodes.len()-1);
-//
-// }

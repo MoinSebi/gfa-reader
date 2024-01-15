@@ -1,7 +1,5 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkGroup, SamplingMode};
-use rand::prelude::SliceRandom;
-use rand::thread_rng;
-use gfa_reader::{Edge, Gfa, NCEdge, NCGfa};
+use criterion::{criterion_group, criterion_main, Criterion};
+use gfa_reader::{Gfa, NCGfa};
 
 
 /// Read a normal graph

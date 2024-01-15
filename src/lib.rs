@@ -41,15 +41,15 @@ impl Header {
 #[derive(Debug, PartialEq, Clone)]
 /// Optional fields for GFA 1
 pub struct OptElem {
-    pub key: String,
-    pub typ: String,
-    pub val: String,
+    pub tag: String,
+    pub typee: String,
+    pub value: String,
 }
 
 impl OptElem {
     /// Write optional field to string
     fn to_string1(&self) -> String{
-        format!("{}\t{}\t{}", self.key, self.typ, self.val)
+        format!("{}\t{}\t{}", self.tag, self.typee, self.value)
     }
 }
 
@@ -68,10 +68,7 @@ pub trait OptFields: Sized + Default + Clone {
 
     fn new() -> Self;
 
-    /// Iterator of the collection
-    fn iter(&self) -> std::slice::Iter<OptElem> {
-        self.iter()
-    }
+
 
 }
 
@@ -92,9 +89,7 @@ impl OptFields for () {
 
     fn new() -> Self {
     }
-    fn iter(&self) -> std::slice::Iter<OptElem> {
-        self.iter()
-    }
+
 
 }
 
@@ -113,7 +108,7 @@ impl OptFields for Vec<OptElem> {
             let tag = parts.next().unwrap();
             let typ = parts.next().unwrap();
             let val = parts.next().unwrap();
-            fields.push(OptElem {key: tag.to_string(), typ: typ.to_string(), val: val.to_string()});
+            fields.push(OptElem { tag: tag.to_string(), typee: typ.to_string(), value: val.to_string()});
 
         }
         fields
@@ -123,28 +118,34 @@ impl OptFields for Vec<OptElem> {
         Vec::new()
     }
 
-    fn iter(&self) -> std::slice::Iter<OptElem> {
-        self.iter()
-    }
+
 }
 
+
+
 #[derive(Debug)]
-/// Graph nodes:
-/// - Identifier
-/// - Sequence
-/// - Optional elements
-pub struct Node<T: OptFields>{
-    pub id: String,
-    pub seq: String,
+/// GFA segment line
+///
+/// Segment or nodes hold sequence
+/// Feature:
+///     - id
+///     - seq
+///     - op
+///
+/// Sequence are "optional", but are always represented in variation graphs
+pub struct Segment<T: OptFields>{
+    pub name: String,
+    pub sequence: String,
+    pub size: u32,
     pub opt: T,
 }
 
 
-impl <T: OptFields>Node<T> {
+impl <T: OptFields> Segment<T> {
 
     /// Write node to string
     fn to_string(&self) -> String {
-        let a = format!("S\t{}\t{}\n", self.id, self.seq.len());
+        let a = format!("S\t{}\t{}\n", self.name, self.sequence.len());
 
         if self.opt.fields().len() > 0 {
             let b: Vec<String> = self.opt.fields().iter().map(|a| a.to_string1()).collect();
@@ -159,7 +160,7 @@ impl <T: OptFields>Node<T> {
     /// Write node to fasta
     fn to_fasta(&self) -> String {
 
-        format!(">{}\n{}", self.id, self.seq)
+        format!(">{}\n{}", self.name, self.sequence)
     }
 }
 
@@ -167,7 +168,9 @@ impl <T: OptFields>Node<T> {
 
 
 #[derive(Debug, PartialEq, Clone, Default)]
-/// Graph edges
+/// GFA containment line
+///
+/// Fields:
 /// - From
 /// - From direction
 /// - To
@@ -177,12 +180,12 @@ impl <T: OptFields>Node<T> {
 /// - Ops
 ///
 /// Comment:
-/// Edges go forward (true) or backward (false) to/from a node.
+/// Very similar to links
 pub struct Containment<T: OptFields>{
-    pub from: String,
-    pub from_dir: bool,
-    pub to: String,
-    pub to_dir: bool,
+    pub container: String,
+    pub container_orient: bool,
+    pub contained: String,
+    pub contained_orient: bool,
     pub pos : usize, // Position of the overlap
     pub overlap: String,
     pub opt: T,
@@ -193,7 +196,7 @@ impl <T: OptFields>Containment<T> {
     #[allow(dead_code)]
     /// Write edge to string
     fn to_string_link(&self) -> String {
-        let a = format!("L\t{}\t{}\t{}\t{}\t{}\n", self.from, {if self.from_dir{"+"} else {"-"}}, self.to, {if self.to_dir{"+"} else {"-"}}, self.overlap);
+        let a = format!("L\t{}\t{}\t{}\t{}\t{}\n", self.container, {if self.container_orient {"+"} else {"-"}}, self.contained, {if self.contained_orient {"+"} else {"-"}}, self.overlap);
         if self.opt.fields().len() > 0 {
             let b: Vec<String> = self.opt.fields().iter().map(|a| a.to_string1()).collect();
             let c = b.join("\t");
@@ -207,18 +210,19 @@ impl <T: OptFields>Containment<T> {
 
 
 #[derive(Debug, PartialEq, Clone, Default)]
-/// Graph edges
+/// GFA link line
+///
+/// Fields:
 /// - From
 /// - From direction
 /// - To
 /// - To direction
 /// - Overlap (Link + containment)
-/// - Pos
 /// - Ops
 ///
 /// Comment:
-/// Edges go forward (true) or backward (false) to/from a node.
-pub struct Edge<T: OptFields>{
+/// Representation of "edges"
+pub struct Link<T: OptFields>{
     pub from: String,
     pub from_dir: bool,
     pub to: String,
@@ -229,7 +233,7 @@ pub struct Edge<T: OptFields>{
 
 
 
-impl <T: OptFields>Edge<T> {
+impl <T: OptFields> Link<T> {
 
     /// Write edge to string
     fn to_string_link(&self) -> String {
@@ -246,12 +250,10 @@ impl <T: OptFields>Edge<T> {
 
 
 
-pub trait IsPath {
-    fn get_name(&self) -> &String;
-}
-
 #[derive(Debug)]
-/// Path features:
+/// GFA path line:
+///
+/// Fields:
 /// - names
 /// - Directions of the nodes
 /// - Node names
@@ -263,12 +265,6 @@ pub struct Path{
     pub dir: Vec<bool>,
     pub nodes: Vec<String>,
     pub overlap: Vec<String>,
-}
-
-impl IsPath for Path{
-    fn get_name(&self) -> &String{
-        &self.name
-    }
 }
 
 impl Path {
@@ -293,42 +289,48 @@ impl Path {
 ///
 /// Comment: When there is not that many paths, the amount of memory for the overlap is not that much.
 pub struct Walk{
-    pub sampleId: String,
-    pub hapIndex: usize,
-    pub seqId: String,
-    pub seqstart: usize,
-    pub seqend: usize,
+    pub sample_id: String,
+    pub hap_index: usize,
+    pub seq_id: String,
+    pub seq_start: usize,
+    pub seq_end: usize,
     pub walk: String,
 }
 
 impl Walk {
 
+        #[allow(dead_code)]
         /// Write path to string (GFA1 format)
         /// v1.1
         fn to_string(&self) -> String {
-            let a = format!("W\t{}\t{}\t{}\t{}\t{}\t{}\n", self.sampleId, self.hapIndex, self.seqId, self.seqstart, self.seqend, self.walk);
+            let a = format!("W\t{}\t{}\t{}\t{}\t{}\t{}\n", self.sample_id, self.hap_index, self.seq_id, self.seq_start, self.seq_end, self.walk);
             a
         }
 }
 
 
+
+
+
 #[derive(Debug)]
 pub struct Fragment<T: OptFields>{
-    pub sampleId: String,
+    pub sample_id: String,
     pub external_ref: usize,
-    pub sbeg_pos: usize,
-    pub send_pos: usize,
-    pub fbeg_pos: usize,
-    pub fend_pos: usize,
+    pub seg_begin: usize,
+    pub seg_end: usize,
+    pub frag_begin: usize,
+    pub frag_end: usize,
     pub alignment: String,
     pub opt: T,
 }
 
 impl <T: OptFields>Fragment<T>{
+
+    #[allow(dead_code)]
     /// Write path to string (GFA1 format)
     /// v2
     fn to_string(&self) -> String {
-        let a = format!("F\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n", self.sampleId, self.external_ref, self.sbeg_pos, self.send_pos, self.fbeg_pos, self.fend_pos, self.alignment);
+        let a = format!("F\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n", self.sample_id, self.external_ref, self.seg_begin, self.seg_end, self.frag_begin, self.frag_end, self.alignment);
         if self.opt.fields().len() > 0 {
             let b: Vec<String> = self.opt.fields().iter().map(|a| a.to_string1()).collect();
             let c = b.join("\t");
@@ -342,14 +344,14 @@ impl <T: OptFields>Fragment<T>{
 #[derive(Debug)]
 /// Ordered and unordered groups
 /// v2.0
-pub struct group{
+pub struct Group {
     pub is_ordered: bool,
     pub name: String,
     pub nodes: Vec<String>,
     pub direction: Vec<bool>,
 }
 
-impl group{
+impl Group {
 
     /// Write group to string (GFA2 format)
     pub fn to_string2(&self) -> String{
@@ -383,8 +385,9 @@ impl group{
 
 
 
-
-pub struct gap<T: OptFields>{
+#[derive(Debug)]
+///
+pub struct Gap<T: OptFields>{
     pub name: String,
     pub sid1: String,
     pub sid1_ref: bool,
@@ -395,8 +398,9 @@ pub struct gap<T: OptFields>{
 }
 
 
-impl <T: OptFields>gap<T> {
+impl <T: OptFields> Gap<T> {
 
+    #[allow(dead_code)]
     /// Write path to string (GFA2 format)
     fn to_string(&self) -> String {
         let a = format!("G\t{}\t{}{}\t{}{}\t{}\n", self.name, self.sid1, {if self.sid1_ref{"+"} else {"-"}}, self.sid2, {if self.sid2_ref{"+"} else {"-"}}, self.dist);
@@ -414,19 +418,20 @@ impl <T: OptFields>gap<T> {
 #[derive(Debug)]
 pub struct Jump<T: OptFields>{
     pub from: String,
-    pub fromOrient: bool,
+    pub from_orient: bool,
     pub to: String,
-    pub toOrient: bool,
+    pub to_orient: bool,
     pub distance: String,
     pub opt: T,
 }
 
 impl <T: OptFields>Jump<T>  {
 
+        #[allow(dead_code)]
         /// Write path to string (GFA1 format)
         /// v1.2
         fn to_string(&self) -> String {
-            let a = format!("J\t{}\t{}\t{}\t{}\t{}\n", self.from, {if self.fromOrient{"+"} else {"-"}}, self.to, {if self.toOrient{"+"} else {"-"}}, self.distance);
+            let a = format!("J\t{}\t{}\t{}\t{}\t{}\n", self.from, {if self.from_orient {"+"} else {"-"}}, self.to, {if self.to_orient {"+"} else {"-"}}, self.distance);
             if self.opt.fields().len() > 0 {
                 let b: Vec<String> = self.opt.fields().iter().map(|a| a.to_string1()).collect();
                 let c = b.join("\t");
@@ -438,6 +443,71 @@ impl <T: OptFields>Jump<T>  {
 }
 
 
+/// GFA edge line
+///
+/// Edges are connection between segments (v2)
+/// More information can be found here: https://gfa-spec.github.io/GFA-spec/GFA2.html#:~:text=GFA2%20is%20a%20generalization%20of,giving%20rise%20to%20each%20sequence.
+pub struct Edges<T: OptFields>{
+    pub id: u32,
+    pub source_name: String,
+    pub sink_name: String,
+    pub source_dir: bool,
+    pub sink_dir: bool,
+    pub source_begin: u32,
+    pub source_end: u32,
+    pub sink_begin: u32,
+    pub sink_end: u32,
+    pub ends: u8,
+    pub alignment: String,
+    pub opts: T
+}
+
+impl <T: OptFields>Edges<T>{
+
+    #[allow(dead_code)]
+    /// Edges to string (GFA2 format)
+    fn to_string2(&self) -> String {
+        let mut a = format!("E\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                        self.id,
+                        self.source_name,
+                        {if self.source_dir{"+"} else {"-"}},
+                        self.sink_name,
+                        {if self.sink_dir{"+"} else {"-"}},
+                        self.source_begin);
+        if &self.ends & &1 != 0 {
+            a.push('$');
+        }
+        use std::fmt::Write;
+
+        write!(&mut a, "\t{}", self.source_end).unwrap();
+        if self.ends & 2 != 0 {
+            a.push('$');
+        }
+
+        write!(&mut a, "\t{}", self.sink_begin).unwrap();
+        if self.ends & 4 != 0 {
+            a.push('$');
+        }
+
+        write!(&mut a, "\t{}", self.sink_end).unwrap();
+        if self.ends & 8 != 0 {
+            a.push('$');
+        }
+
+        write!(&mut a, "\t{}", self.alignment).unwrap();
+
+        if self.opts.fields().len() > 0 {
+            let b: Vec<String> = self.opts.fields().iter().map(|a| a.to_string1()).collect();
+            let c = b.join("\t");
+            format!("{}{}\n", a, c)
+        } else {
+            a
+        }
+    }
+
+}
+
+
 
 
 
@@ -446,22 +516,21 @@ impl <T: OptFields>Jump<T>  {
 
 
 #[derive(Debug)]
-/// The gfa contains
-/// - header
-/// - nodes
-/// - paths
-/// - edges
+/// A representation of a GFA file (v1 + v2)
 ///
-/// Comment: This implementation should be able to parse any kind of GFAv1, but has increased
+/// GFA v1 + 1.1/1.2 + v2
+///
+/// Comment: This implementation should be able to parse any kind of GFA file, but has increased
 /// memory consumption, since most node ids are stored at Strings which are a minimum of 24 bytes.
 /// This is only maintained, since it is not of further use in any of my projects.
 pub struct Gfa<T: OptFields>{
 
     // GFA 1.0 data
     pub header: Header,
-    pub nodes: Vec<Node<T>>,
+    pub segments: Vec<Segment<T>>,
     pub paths: Vec<Path>,
-    pub edges: Option<Vec<Edge<T>>>,
+    pub links: Option<Vec<Link<T>>>,
+    pub containments: Vec<Containment<T>>,
 
     // GFA 1.1/1.2 data
     pub walk: Vec<Walk>,
@@ -469,13 +538,14 @@ pub struct Gfa<T: OptFields>{
 
     // GFA 2.0 data
     pub fragments: Vec<Fragment<T>>,
-    pub groups: Vec<group>,
+    pub groups: Vec<Group>,
+    pub gaps: Vec<Gap<T>>,
     pub string2index: HashMap<String, usize>,
 }
 
 
 
-impl <T: OptFields> Gfa <T>{
+impl <T: OptFields> Gfa<T>{
     /// Graph constructor
     ///
     /// # Example
@@ -487,15 +557,17 @@ impl <T: OptFields> Gfa <T>{
     /// ```
     pub fn new() -> Self {
         Self {
-            nodes: Vec::new(),
+            segments: Vec::new(),
             paths: Vec::new(),
-            edges: None,
+            links: None,
             header: Header{tag: "".to_string(), typ: "".to_string(), version_number: "".to_string()},
+            containments: Vec::new(),
             walk: Vec::new(), // v1.1
             jumps: Vec::new(), // v1.2
             string2index: HashMap::new(),
             fragments: Vec::new(), // v2.0
             groups: Vec::new(), // v2.0
+            gaps: Vec::new(), // 2.0
 
         }
     }
@@ -512,18 +584,18 @@ impl <T: OptFields> Gfa <T>{
     pub fn check_nc(&mut self) -> Option<Vec<usize>>{
 
         // If the graph has no nodes -> returns false
-        if self.nodes.len() == 0 {
+        if self.segments.len() == 0 {
             return None
         }
 
 
         // Check if the graph is numeric
 
-        let is_digit = self.nodes.iter().map(|x| x.id.chars().map(|g| g.is_ascii_digit()).collect::<Vec<bool>>().contains(&false)).collect::<Vec<bool>>().contains(&false);
+        let is_digit = self.segments.iter().map(|x| x.name.chars().map(|g| g.is_ascii_digit()).collect::<Vec<bool>>().contains(&false)).collect::<Vec<bool>>().contains(&false);
 
         // Check if the numeric nodes are compact
         if is_digit {
-            let mut numeric_nodes = self.nodes.iter().map(|x| x.id.parse::<usize>().unwrap()).collect::<Vec<usize>>();
+            let mut numeric_nodes = self.segments.iter().map(|x| x.name.parse::<usize>().unwrap()).collect::<Vec<usize>>();
             numeric_nodes.sort();
             let _f = numeric_nodes.windows(2).all(|pair| pair[1] == &pair[0] + 1);
 
@@ -564,10 +636,11 @@ impl <T: OptFields> Gfa <T>{
             } else {
                 Box::new(BufReader::new(file))
             };
+            let version_number = get_version(file_name);
 
 
-            let mut nodes: Vec<Node<T>> = Vec::new();
-            let mut edges: Vec<Edge<T>> = Vec::new();
+            let mut nodes: Vec<Segment<T>> = Vec::new();
+            let mut edges: Vec<Link<T>> = Vec::new();
             // Iterate over lines
             for line in reader.lines() {
                 let l = line.unwrap();
@@ -577,9 +650,17 @@ impl <T: OptFields> Gfa <T>{
                 let line_split: Vec<&str> = l.split("\t").collect();
                 match first {
                     "S" => {
+                        let name = a.next().unwrap().parse().unwrap();
+                        if version_number < 2.0 {
+                            let sequence: String = a.next().unwrap().parse().unwrap();
+                            let size = sequence.len() as u32;
+                            nodes.push(Segment { name, sequence, size, opt: T::parse(a) });
+                        } else {
+                            let sequence: String = a.next().unwrap().parse().unwrap();
+                            let size = a.next().unwrap().parse().unwrap();
+                            nodes.push(Segment { name, sequence, size, opt: T::parse(a) });
+                        }
 
-
-                        nodes.push(Node { id: a.next().unwrap().parse().unwrap(), seq:  a.next().unwrap().parse().unwrap(), opt: T::parse(a) });
 
 
                     },
@@ -603,14 +684,14 @@ impl <T: OptFields> Gfa <T>{
                         if edge {
 
                             //edges.push(Edge{from: line_split[1].parse().unwrap(), from_dir: if line_split[2] == "+" { !false } else { !true }, to: line_split[3].parse().unwrap(), to_dir: if line_split[4] == "+" { !false } else { !true }, overlap: line_split[5].parse().unwrap(), opt: T::parse(line_split)});
-                            edges.push(Edge{from: a.next().unwrap().to_string(), from_dir: if a.next().unwrap() == "+" { !false } else { !true }, to: a.next().unwrap().to_string(), to_dir: if a.next().unwrap() == "+" { !false } else { !true }, overlap: a.next().unwrap().to_string(), opt: T::parse(a)});
+                            edges.push(Link {from: a.next().unwrap().to_string(), from_dir: if a.next().unwrap() == "+" { !false } else { !true }, to: a.next().unwrap().to_string(), to_dir: if a.next().unwrap() == "+" { !false } else { !true }, overlap: a.next().unwrap().to_string(), opt: T::parse(a)});
 
                         }
 
                     }
                     "C" => {
                         if edge {
-                            edges.push(Edge{from: a.next().unwrap().to_string(), from_dir: if a.next().unwrap() == "+" { !false } else { !true }, to: a.next().unwrap().to_string(), to_dir: if a.next().unwrap() == "+" { !false } else { !true }, overlap: a.next().unwrap().to_string(), opt: T::parse(a)});
+                            edges.push(Link {from: a.next().unwrap().to_string(), from_dir: if a.next().unwrap() == "+" { !false } else { !true }, to: a.next().unwrap().to_string(), to_dir: if a.next().unwrap() == "+" { !false } else { !true }, overlap: a.next().unwrap().to_string(), opt: T::parse(a)});
 
                         }
                     }
@@ -619,21 +700,21 @@ impl <T: OptFields> Gfa <T>{
                         self.header = header;
                     }
                     "W" => {
-                        let sampleId = a.next().unwrap().to_string();
-                        let hapIndex = a.next().unwrap().parse().unwrap();
-                        let seqId = a.next().unwrap().to_string();
-                        let seqstart = a.next().unwrap().parse().unwrap();
-                        let seqend = a.next().unwrap().parse().unwrap();
+                        let sample_id = a.next().unwrap().to_string();
+                        let hap_index = a.next().unwrap().parse().unwrap();
+                        let seq_id = a.next().unwrap().to_string();
+                        let seq_start = a.next().unwrap().parse().unwrap();
+                        let seq_end = a.next().unwrap().parse().unwrap();
                         let walk = a.next().unwrap().to_string();
-                        self.walk.push(Walk{sampleId, hapIndex, seqId, seqstart, seqend, walk});
+                        self.walk.push(Walk{ sample_id, hap_index, seq_id, seq_start, seq_end, walk});
                     }
                     "J" => {
                         let from = a.next().unwrap().to_string();
-                        let fromOrient = if a.next().unwrap() == "+" { !false } else { !true };
+                        let from_orient = if a.next().unwrap() == "+" { !false } else { !true };
                         let to = a.next().unwrap().to_string();
-                        let toOrient = if a.next().unwrap() == "+" { !false } else { !true };
+                        let to_orient = if a.next().unwrap() == "+" { !false } else { !true };
                         let distance = a.next().unwrap().to_string();
-                        self.jumps.push(Jump{from, fromOrient, to, toOrient, distance, opt: T::parse(a)});
+                        self.jumps.push(Jump{from, from_orient: from_orient, to, to_orient: to_orient, distance, opt: T::parse(a)});
                     }
                     _ => {
                     }
@@ -641,9 +722,9 @@ impl <T: OptFields> Gfa <T>{
 
             }
             if edge {
-                self.edges = Some(edges);
+                self.links = Some(edges);
             }
-            self.nodes.extend(nodes);
+            self.segments.extend(nodes);
 
         }
 
@@ -655,10 +736,10 @@ impl <T: OptFields> Gfa <T>{
         let mut f = BufWriter::new(f);
 
         write!(f, "{}",  self.header.to_string1()).expect("Not able to write");
-        for node in self.nodes.iter() {
+        for node in self.segments.iter() {
             write!(f, "{}", node.to_string()).expect("Not able to write");
         }
-        match &self.edges {
+        match &self.links {
             Some(value) =>{
                 for edge in value.iter() {
                     write!(f, "{}", edge.to_string_link()).expect("Not able to write");
@@ -672,7 +753,8 @@ impl <T: OptFields> Gfa <T>{
     }
 
 
-    pub fn convert_to_ncgraph(& self, graph: &Gfa<T>, edge: bool) -> NCGfa<T>{
+
+    pub fn convert_to_ncgraph(& self, graph: &Gfa<T>) -> NCGfa<T>{
         let mut ncgraph: NCGfa<T> = NCGfa::new();
         let f = ncgraph.make_mapper(graph);
         ncgraph.convert_with_mapper(f, &graph);
@@ -680,125 +762,6 @@ impl <T: OptFields> Gfa <T>{
     }
 }
 
-
-
-
-/// PanSN-spec path data structure
-///
-/// PanSN-spec
-/// [sample_name][delim][haplotype_id][delim][contig_or_scaffold_name]
-pub struct Pansn<'a, T: IsPath>{
-    pub genomes: Vec<Sample<'a, T>>,
-}
-
-pub struct Sample<'a, T: IsPath>{
-    pub name: String,
-    pub haplotypes: Vec<Haplotype<'a, T>>
-
-}
-
-/// PanSN-spec haplotype
-///
-/// Merging multiple paths together
-pub struct Haplotype<'a, T: IsPath> {
-    pub name: String,
-    pub paths: Vec<&'a T>
-}
-
-impl <'a, T: IsPath> Pansn<'a, T> {
-
-    /// Create Pansn from a list of paths
-    pub fn from_graph(paths: &'a Vec<T>, del: &str) -> Self{
-        let mut genomes: Vec<Sample<'a, T>> = Vec::new();
-
-        // If no del -> one path is one haplotype is one path
-        if del == " " {
-            for path in paths.iter() {
-                genomes.push(Sample {name: path.get_name().to_string(), haplotypes: vec![Haplotype{name: path.get_name().to_string(), paths: vec![path]}]})
-            }
-        } else {
-            for path in paths.iter() {
-                let name_split: Vec<&str> = path.get_name().split(del).collect();
-                let mut genome;
-                let mut haplotype;
-                if name_split.len() > 1{
-                    genome = name_split[0].to_string();
-                    haplotype = name_split[1].to_string();
-                } else {
-                    panic!("No Pansn, remove sep or adjust gfa")
-                }
-                // Gibt es schon so ein Genome?
-                if let Some((index1, _)) = genomes.iter().enumerate().find(|(_, item)| item.name == genome) {
-                    let mut genome = &mut genomes[index1];
-                    // Gibt es schon ein Haplotype
-                    if let Some((index2, _)) = genome.haplotypes.iter().enumerate().find(|(_, item)| item.name == haplotype) {
-                        let haplo = &mut genome.haplotypes[index2];
-                        haplo.paths.push(path);
-                    } else {
-                        let haplo = Haplotype{name: haplotype, paths: vec![path]};
-                        genome.haplotypes.push(haplo);
-
-                    }
-                } else {
-                    let haplo = Haplotype{name: haplotype, paths: vec![path]};
-                    let genome = Sample {name: genome, haplotypes: vec![haplo]};
-                    genomes.push(genome);
-                    println!("Did not find the specific string.");
-                }
-
-            }
-        }
-        Pansn {
-            genomes: genomes,
-        }
-    }
-
-    pub fn get_haplo_path(&self) -> Vec<(String, Vec<&'a T>)>{
-        let mut result = Vec::new();
-
-        for x in self.genomes.iter(){
-
-            for y in x.haplotypes.iter(){
-
-                let mut kk: Vec<&T> = y.paths.iter().map(|i| i.clone()).collect();
-                result.push((x.name.clone() + "#" + &y.name, kk));
-            }
-        }
-
-        result
-    }
-
-    pub fn get_path_genome(&self) -> Vec<(String, Vec<&'a T>)>{
-        let mut result = Vec::new();
-
-        for x in self.genomes.iter(){
-
-            let mut aa = Vec::new();
-            for y in x.haplotypes.iter(){
-
-                let mut kk: Vec<&T> = y.paths.iter().map(|i| i.clone()).collect();
-                aa.extend(kk);
-            }
-            result.push((x.name.clone(), aa));
-        }
-
-        result
-    }
-
-    pub fn get_paths_direct(&self) -> Vec<(String, Vec<&'a T>)>{
-        let mut result = Vec::new();
-
-        for x in self.genomes.iter(){
-
-            for y in x.haplotypes.iter(){
-
-                y.paths.iter().for_each(|i| result.push((i.get_name().to_string(), vec![i.clone()])))
-            }
-        }
-        return result
-    }
-
-}
 
 
 
@@ -940,12 +903,6 @@ impl NCPath{
     }
 }
 
-impl IsPath for NCPath{
-    fn get_name(&self) -> &String{
-        &self.name
-    }
-}
-
 impl  <T: OptFields>NCGfa <T> {
 
     /// NGraph constructor
@@ -1078,7 +1035,7 @@ impl  <T: OptFields>NCGfa <T> {
 
         let mut graph: Gfa<T> = Gfa::new();
         graph.parse_gfa_file(file_name, edges);
-        let ncgraph: NCGfa<T> = graph.convert_to_ncgraph(&graph, edges, );
+        let ncgraph: NCGfa<T> = graph.convert_to_ncgraph(&graph);
         self.header = ncgraph.header;
         self.nodes = ncgraph.nodes;
         self.edges = ncgraph.edges;
@@ -1090,7 +1047,7 @@ impl  <T: OptFields>NCGfa <T> {
 
     /// Creat a map from string node id -> numeric node id
     pub fn make_mapper(&mut self, graph: & Gfa<T>) -> HashMap<String, usize> {
-        let mut f = graph.nodes.iter().map(|x| x.id.clone()).collect::<Vec<String>>();
+        let mut f = graph.segments.iter().map(|x| x.name.clone()).collect::<Vec<String>>();
         f.sort_by_key(|digit| digit.parse::<u32>().unwrap());
         let mut wrapper = HashMap::new();
         for (i, node) in f.iter().enumerate() {
@@ -1103,11 +1060,11 @@ impl  <T: OptFields>NCGfa <T> {
     ///
     /// Using the mapper from "make_mapper"
     pub fn convert_with_mapper(&mut self, mapper: HashMap<String, usize>, graph: &Gfa<T>){
-        let mut nodes: Vec<NCNode<T>> = graph.nodes.iter().map(|x| NCNode{id: mapper.get(&x.id).unwrap().clone() as u32, seq: x.seq.clone(), opt: x.opt.clone()}).collect();
+        let mut nodes: Vec<NCNode<T>> = graph.segments.iter().map(|x| NCNode{id: mapper.get(&x.name).unwrap().clone() as u32, seq: x.sequence.clone(), opt: x.opt.clone()}).collect();
         nodes.sort_by_key(|a| a.id);
         self.nodes = nodes;
         self.edges = None;
-        match &graph.edges{
+        match &graph.links {
             Some(value) => {
                 self.edges = Some(value.iter().map(|x| NCEdge{from: mapper.get(&x.from).unwrap().clone() as u32, from_dir: x.from_dir.clone(), to: mapper.get(&x.to).unwrap().clone() as u32, to_dir: x.to_dir.clone(), overlap: "".to_string(), opt: x.opt.clone() }).collect());
 
@@ -1196,5 +1153,156 @@ pub fn vec_is_compact(numeric_nodes: &Vec<usize>) -> bool{
     numeric_nodes.windows(2).all(|pair| pair[1] == &pair[0] + 1)
 }
 
+fn get_version(file_path: &str) -> f32{
+    let file = File::open(file_path).expect("ERROR: CAN NOT READ FILE\n");
 
+    // Parse plain text or gzipped file
+    let reader: Box<dyn BufRead> = if file_path.ends_with(".gz") {
+        Box::new(BufReader::new(GzDecoder::new(file)))
+    } else {
+        Box::new(BufReader::new(file))
+    };
+
+
+    // Read the first line of the file
+    let first_line  = reader.lines().next().unwrap().unwrap();
+    let line = first_line.split("\t").nth(1).unwrap();
+    let version_number = line.split(':').nth(2).unwrap().to_string();
+    return version_number.parse::<f32>().unwrap();
+
+}
+
+
+
+//-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+/// IsPath trait
+///
+/// Can be used to create a Pansn from a Gfa using NCPath or Path
+pub trait IsPath {
+    fn get_name(&self) -> &String;
+}
+
+
+
+impl IsPath for Path{
+    fn get_name(&self) -> &String{
+        &self.name
+    }
+}
+
+impl IsPath for NCPath{
+    fn get_name(&self) -> &String{
+        &self.name
+    }
+}
+
+
+/// PanSN-spec path data structure
+///
+/// PanSN-spec
+/// [sample_name][delim][haplotype_id][delim][contig_or_scaffold_name]
+pub struct Pansn<'a, T: IsPath>{
+    pub genomes: Vec<Sample<'a, T>>,
+}
+
+pub struct Sample<'a, T: IsPath>{
+    pub name: String,
+    pub haplotypes: Vec<Haplotype<'a, T>>
+
+}
+
+/// PanSN-spec haplotype
+///
+/// Merging multiple paths together
+pub struct Haplotype<'a, T: IsPath> {
+    pub name: String,
+    pub paths: Vec<&'a T>
+}
+
+impl <'a, T: IsPath> Pansn<'a, T> {
+
+    /// Create Pansn from a list of paths
+    pub fn from_graph(paths: &'a Vec<T>, del: &str) -> Self{
+        let mut genomes: Vec<Sample<'a, T>> = Vec::new();
+
+        // If no del -> one path is one haplotype is one path
+        if del == " " {
+            for path in paths.iter() {
+                genomes.push(Sample {name: path.get_name().to_string(), haplotypes: vec![Haplotype{name: path.get_name().to_string(), paths: vec![path]}]})
+            }
+        } else {
+            for path in paths.iter() {
+                let name_split: Vec<&str> = path.get_name().split(del).collect();
+                let genome;
+                let haplotype;
+                if name_split.len() > 1{
+                    genome = name_split[0].to_string();
+                    haplotype = name_split[1].to_string();
+                } else {
+                    panic!("No Pansn, remove sep or adjust gfa")
+                }
+                // Gibt es schon so ein Genome?
+                if let Some((index1, _)) = genomes.iter().enumerate().find(|(_, item)| item.name == genome) {
+                    let genome = &mut genomes[index1];
+                    // Gibt es schon ein Haplotype
+                    if let Some((index2, _)) = genome.haplotypes.iter().enumerate().find(|(_, item)| item.name == haplotype) {
+                        let haplo = &mut genome.haplotypes[index2];
+                        haplo.paths.push(path);
+                    } else {
+                        let haplo = Haplotype{name: haplotype, paths: vec![path]};
+                        genome.haplotypes.push(haplo);
+
+                    }
+                } else {
+                    let haplo = Haplotype{name: haplotype, paths: vec![path]};
+                    let genome = Sample {name: genome, haplotypes: vec![haplo]};
+                    genomes.push(genome);
+                    println!("Did not find the specific string.");
+                }
+
+            }
+        }
+        Pansn {
+            genomes,
+        }
+    }
+
+    pub fn get_haplo_path(&self) -> Vec<(String, Vec<&'a T>)>{
+        let mut result = Vec::new();
+        for x in self.genomes.iter(){
+            for y in x.haplotypes.iter(){
+                let kk: Vec<&T> = y.paths.iter().map(|i| *i).collect();
+                result.push((x.name.clone() + "#" + &y.name, kk));
+            }
+        }
+
+        result
+    }
+
+    pub fn get_path_genome(&self) -> Vec<(String, Vec<&'a T>)>{
+        let mut result = Vec::new();
+        for x in self.genomes.iter(){
+            let mut aa = Vec::new();
+            for y in x.haplotypes.iter(){
+                let kk: Vec<&T> = y.paths.iter().map(|i| *i).collect();
+                aa.extend(kk);
+            }
+            result.push((x.name.clone(), aa));
+        }
+
+        result
+    }
+
+    pub fn get_paths_direct(&self) -> Vec<(String, Vec<&'a T>)>{
+        let mut result = Vec::new();
+        for x in self.genomes.iter(){
+            for y in x.haplotypes.iter(){
+                y.paths.iter().for_each(|i| result.push((i.get_name().to_string(), vec![*i])))
+            }
+        }
+        return result
+    }
+
+}
 
