@@ -35,8 +35,19 @@ In several specific cases, edges are not needed since the graph structure
 can be shown with the path information. The edges struct is always present, 
 but depending on the parse settings, will never be populated. 
 
-``` 
+```doctestinjectablerust
 LEER
+```
+## PanSN
+Pan-SN spec is a specification for storing variation graphs in a GFA format. It is strongly supported by gfa-reader with a pansn struct. It allows you to utilize genome, haplotype or path level collections, dependent on the use case.
+
+```rust
+/// use gfa_reader::{Gfa, Pansn, Path};
+///
+/// let mut graph: Gfa<()> = Gfa::new();
+/// graph.parse_gfa_file("data/size5.gfa", false);
+/// let pansn: Pansn<Path> = Pansn::from_graph(&graph.paths, " ");
+
 ```
 
 ### Additional information

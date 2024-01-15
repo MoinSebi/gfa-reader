@@ -1295,21 +1295,32 @@ impl IsPath for NCPath{
     }
 }
 
-
+#[derive(Debug, Clone)]
 /// PanSN-spec path data structure
 ///
+/// ```
+///
+/// use gfa_reader::{Gfa, Pansn, Path};
+///
+/// let mut graph: Gfa<()> = Gfa::new();
+/// graph.parse_gfa_file("data/size5.gfa", false);
+/// let pansn: Pansn<Path> = Pansn::from_graph(&graph.paths, " ");
+/// println!("{:?}", pansn);
+/// ```
 /// PanSN-spec
 /// [sample_name][delim][haplotype_id][delim][contig_or_scaffold_name]
 pub struct Pansn<'a, T: IsPath>{
     pub genomes: Vec<Sample<'a, T>>,
 }
 
+#[derive(Debug, Clone)]
 pub struct Sample<'a, T: IsPath>{
     pub name: String,
     pub haplotypes: Vec<Haplotype<'a, T>>
 
 }
 
+#[derive(Debug, Clone)]
 /// PanSN-spec haplotype
 ///
 /// Merging multiple paths together
