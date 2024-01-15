@@ -442,7 +442,7 @@ impl <T: OptFields>Jump<T>  {
         }
 }
 
-
+#[derive(Debug)]
 /// GFA edge line
 ///
 /// Edges are connection between segments (v2)
@@ -457,7 +457,7 @@ pub struct Edges<T: OptFields>{
     pub source_end: u32,
     pub sink_begin: u32,
     pub sink_end: u32,
-    pub ends: u8,
+    pub ends: u8, // Bits 1 = source_begin, 2 = source_end, 4 = sink_begin, 8 = sink_end
     pub alignment: String,
     pub opts: T
 }
@@ -537,6 +537,7 @@ pub struct Gfa<T: OptFields>{
     pub jumps: Vec<Jump<T>>,
 
     // GFA 2.0 data
+    pub edges: Vec<Edges<T>>,
     pub fragments: Vec<Fragment<T>>,
     pub groups: Vec<Group>,
     pub gaps: Vec<Gap<T>>,
@@ -565,6 +566,8 @@ impl <T: OptFields> Gfa<T>{
             walk: Vec::new(), // v1.1
             jumps: Vec::new(), // v1.2
             string2index: HashMap::new(),
+
+            edges: Vec::new(), // v2.0
             fragments: Vec::new(), // v2.0
             groups: Vec::new(), // v2.0
             gaps: Vec::new(), // 2.0
@@ -624,7 +627,7 @@ impl <T: OptFields> Gfa<T>{
     /// let mut graph = Gfa::new();
     /// graph.parse_gfa_file("/path/to/graph");
     /// ´´´
-    pub fn parse_gfa_file(&mut self, file_name: &str, edge: bool) {
+    pub fn parse_gfa_file(&mut self, file_name: &str, edges: bool) {
 
 
         if file_path::new(file_name).exists() {
@@ -640,7 +643,7 @@ impl <T: OptFields> Gfa<T>{
 
 
             let mut nodes: Vec<Segment<T>> = Vec::new();
-            let mut edges: Vec<Link<T>> = Vec::new();
+            let mut links: Vec<Link<T>> = Vec::new();
             // Iterate over lines
             for line in reader.lines() {
                 let l = line.unwrap();
@@ -681,17 +684,17 @@ impl <T: OptFields> Gfa<T>{
 
                     },
                     "L" => {
-                        if edge {
+                        if edges {
 
                             //edges.push(Edge{from: line_split[1].parse().unwrap(), from_dir: if line_split[2] == "+" { !false } else { !true }, to: line_split[3].parse().unwrap(), to_dir: if line_split[4] == "+" { !false } else { !true }, overlap: line_split[5].parse().unwrap(), opt: T::parse(line_split)});
-                            edges.push(Link {from: a.next().unwrap().to_string(), from_dir: if a.next().unwrap() == "+" { !false } else { !true }, to: a.next().unwrap().to_string(), to_dir: if a.next().unwrap() == "+" { !false } else { !true }, overlap: a.next().unwrap().to_string(), opt: T::parse(a)});
+                            links.push(Link {from: a.next().unwrap().to_string(), from_dir: if a.next().unwrap() == "+" { !false } else { !true }, to: a.next().unwrap().to_string(), to_dir: if a.next().unwrap() == "+" { !false } else { !true }, overlap: a.next().unwrap().to_string(), opt: T::parse(a)});
 
                         }
 
                     }
                     "C" => {
-                        if edge {
-                            edges.push(Link {from: a.next().unwrap().to_string(), from_dir: if a.next().unwrap() == "+" { !false } else { !true }, to: a.next().unwrap().to_string(), to_dir: if a.next().unwrap() == "+" { !false } else { !true }, overlap: a.next().unwrap().to_string(), opt: T::parse(a)});
+                        if edges {
+                            self.containments.push(Containment {container: a.next().unwrap().to_string(), container_orient: if a.next().unwrap() == "+" { !false } else { !true }, contained: a.next().unwrap().to_string(), contained_orient: if a.next().unwrap() == "+" { !false } else { !true }, overlap: a.next().unwrap().to_string(), opt: T::parse(a), pos: 0 });
 
                         }
                     }
@@ -716,13 +719,89 @@ impl <T: OptFields> Gfa<T>{
                         let distance = a.next().unwrap().to_string();
                         self.jumps.push(Jump{from, from_orient: from_orient, to, to_orient: to_orient, distance, opt: T::parse(a)});
                     }
+
+                    "G" => {
+                        let name = a.next().unwrap().to_string();
+                        let sid1 = a.next().unwrap().to_string();
+                        let sid2 = a.next().unwrap().to_string();
+                        let dist = a.next().unwrap().parse().unwrap();
+                        self.gaps.push(Gap{name, sid1, sid1_ref: false, sid2, sid2_ref: false, dist, tag: T::parse(a)});
+                    }
+
+                    "F" => {
+                        let sample_id = a.next().unwrap().to_string();
+                        let external_ref = a.next().unwrap().parse().unwrap();
+                        let seg_begin = a.next().unwrap().parse().unwrap();
+                        let seg_end = a.next().unwrap().parse().unwrap();
+                        let frag_begin = a.next().unwrap().parse().unwrap();
+                        let frag_end = a.next().unwrap().parse().unwrap();
+                        let alignment = a.next().unwrap().to_string();
+                        self.fragments.push(Fragment{sample_id, external_ref, seg_begin, seg_end, frag_begin, frag_end, alignment, opt: T::parse(a)});
+                    }
+                    "E" => {
+                        let id = a.next().unwrap().parse().unwrap();
+
+                        let (source_name, source_dir) = split_string(a.next().unwrap()).unwrap();
+                        let (sink_name, sink_dir) = split_string(a.next().unwrap()).unwrap();
+
+                        let mut end = 0;
+                        let source_begin: String = a.next().unwrap().parse().unwrap();
+                        end = if source_begin.ends_with("$"){end & 1} else {end};
+                        let s1 = source_begin.replace("$", "").parse().unwrap();
+
+                        let  s2: String = a.next().unwrap().parse().unwrap();
+                        end = if s2.ends_with("$"){end & 2} else {end};
+                        let s2 = s2.replace("$", "").parse().unwrap();
+
+                        let  s3: String = a.next().unwrap().parse().unwrap();
+                        end = if s3.ends_with("$"){end & 4} else {end};
+                        let s3 = s3.replace("$", "").parse().unwrap();
+
+                        let s4: String = a.next().unwrap().parse().unwrap();
+                        end = if s4.ends_with("$"){end & 8} else {end};
+                        let s4 = s4.replace("$", "").parse().unwrap();
+
+                        let alignment = a.next().unwrap().to_string();
+
+                        self.edges.push(Edges{id,
+                            source_name: source_name.to_string(),
+                            sink_name: sink_name.to_string(),
+                            source_dir: source_dir,
+                            sink_dir: sink_dir,
+                            source_begin: s1,
+                            source_end: s2,
+                            sink_begin: s3,
+                            sink_end: s4,
+                            ends: end,
+                            alignment: alignment,
+                            opts: T::parse(a)});
+                    }
+                    "O" => {
+                        let is_ordered = true;
+                        let name = a.next().unwrap().to_string();
+                        let nodes: Vec<(&str, bool)> = a.next().unwrap().split(" ").map(|d| split_string(d).unwrap()).collect();
+                        let (nodes, direction): (Vec<&str>, Vec<bool>) = nodes.iter().cloned().unzip();
+                        self.groups.push(Group{is_ordered, direction: direction, nodes: nodes.iter().map(|a| a.to_string()).collect(), name: name});
+                    }
+                    "U" => {
+                        let is_ordered = false;
+                        let name = a.next().unwrap().to_string();
+                        let nodes: Vec<(&str, bool)> = a.next().unwrap().split(" ").map(|d| split_string(d).unwrap()).collect();
+                        let (nodes, direction): (Vec<&str>, Vec<bool>) = nodes.iter().cloned().unzip();
+                        self.groups.push(Group{is_ordered, direction: direction, nodes: nodes.iter().map(|a| a.to_string()).collect(), name: name});
+                    }
+
+
+
+
+
                     _ => {
                     }
                 }
 
             }
-            if edge {
-                self.links = Some(edges);
+            if edges {
+                self.links = Some(links);
             }
             self.segments.extend(nodes);
 
@@ -1170,6 +1249,19 @@ fn get_version(file_path: &str) -> f32{
     let version_number = line.split(':').nth(2).unwrap().to_string();
     return version_number.parse::<f32>().unwrap();
 
+}
+
+fn split_string(input_string: &str) -> Option<(&str, bool)> {
+    let len = input_string.len();
+
+    if len >= 1 {
+        let first_substring = &input_string[0..len - 1];
+        let last_letter = if &input_string[len - 1..] == "+"{true} else {false};
+
+        Some((first_substring, last_letter))
+    } else {
+        None
+    }
 }
 
 

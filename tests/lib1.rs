@@ -1,4 +1,4 @@
-use gfa_reader::{Link, Gfa, NCGfa, NCPath, Pansn, Path};
+use gfa_reader::{Link, Gfa, NCGfa, Pansn, Path};
 
 #[test]
 /// Check full header
