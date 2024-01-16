@@ -11,7 +11,7 @@ fn gfa_normal(filename: &str) {
 /// Read a NC graph
 fn ngfa_normal(filename: &str) {
     let mut _intervals: NCGfa<()> = NCGfa::new();
-    let f = _intervals.parse_gfa_file_direct(filename, true);
+    _intervals.parse_gfa_file_direct(filename, true);
     //sort_vector(&mut intervals);
 }
 

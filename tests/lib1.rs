@@ -127,7 +127,7 @@ fn convert_gfa_ncgfa2() {
     let mut graph: Gfa<()> = Gfa::new();
     graph.parse_gfa_file(filename, false);
     let a = graph.convert_to_ncgraph(&graph);
-    assert_eq!(true, a.check_numeric());
+    assert!(a.check_numeric());
 }
 
 #[test]
