@@ -23,7 +23,7 @@ impl Header {
 
     /// Parse header from string (H-line)
     fn from_string(line: &str) -> Header {
-        let line = line.split("\t").nth(1).unwrap();
+        let line = line.split('\t').nth(1).unwrap();
         let tag = line.split(':').nth(0).unwrap().to_string();
         let typ = line.split(':').nth(1).unwrap().to_string();
         let version_number = line.split(':').nth(2).unwrap().to_string();
@@ -59,7 +59,7 @@ pub trait OptFields: Sized + Default + Clone {
     /// Given an iterator over a split, each expected to hold one
     /// optional field (in the <TAG>:<TYPE>:<VALUE> format), parse
     /// them as optional fields to create a collection.
-    fn parse(input: Split<&str>) -> Self;
+    fn parse(input: Split<char>) -> Self;
 
     fn new() -> Self;
 }
@@ -72,7 +72,7 @@ impl OptFields for () {
         &[]
     }
 
-    fn parse(_input: Split<&str>) -> Self {}
+    fn parse(_input: Split<char>) -> Self {}
 
     fn new() -> Self {}
 }
@@ -82,10 +82,10 @@ impl OptFields for Vec<OptElem> {
     fn fields(&self) -> &[OptElem] {
         self.as_slice()
     }
-    fn parse(mut input: Split<&str>) -> Self {
+    fn parse(input: Split<char>) -> Self {
         let mut fields = Vec::new();
 
-        while let Some(value) = input.next() {
+        for value in input {
             let mut parts = value.split(':');
             let tag = parts.next().unwrap();
             let typ = parts.next().unwrap();
@@ -126,7 +126,7 @@ impl<T: OptFields> Segment<T> {
     fn to_string(&self) -> String {
         let a = format!("S\t{}\t{}\n", self.name, self.sequence.len());
 
-        if self.opt.fields().len() > 0 {
+        if !self.opt.fields().is_empty() {
             let b: Vec<String> = self.opt.fields().iter().map(|a| a.to_string1()).collect();
             let c = b.join("\t");
             format!("{}{}\n", a, c)
@@ -190,7 +190,7 @@ impl<T: OptFields> Containment<T> {
             },
             self.overlap
         );
-        if self.opt.fields().len() > 0 {
+        if !self.opt.fields().is_empty() {
             let b: Vec<String> = self.opt.fields().iter().map(|a| a.to_string1()).collect();
             let c = b.join("\t");
             format!("{}{}\n", a, c)
@@ -245,7 +245,7 @@ impl<T: OptFields> Link<T> {
             },
             self.overlap
         );
-        if self.opt.fields().len() > 0 {
+        if !self.opt.fields().is_empty() {
             let b: Vec<String> = self.opt.fields().iter().map(|a| a.to_string1()).collect();
             let c = b.join("\t");
             format!("{}{}\n", a, c)
@@ -371,7 +371,7 @@ impl<T: OptFields> Fragment<T> {
             self.frag_end,
             self.alignment
         );
-        if self.opt.fields().len() > 0 {
+        if !self.opt.fields().is_empty() {
             let b: Vec<String> = self.opt.fields().iter().map(|a| a.to_string1()).collect();
             let c = b.join("\t");
             format!("{}{}\n", a, c)
@@ -420,7 +420,7 @@ impl Group {
             let f2 = f1.join("\t");
             format!("{}\t{}\n", a, f2)
         } else {
-            let f1: Vec<String> = self.nodes.iter().map(|n| format!("{}", n)).collect();
+            let f1: Vec<String> = self.nodes.iter().map(|n| n.to_string()).collect();
             let f2 = f1.join("\t");
             format!("{}\t{}\n", a, f2)
         }
@@ -491,7 +491,7 @@ impl<T: OptFields> Gap<T> {
             },
             self.dist
         );
-        if self.tag.fields().len() > 0 {
+        if !self.tag.fields().is_empty() {
             let b: Vec<String> = self.tag.fields().iter().map(|a| a.to_string1()).collect();
             let c = b.join("\t");
             format!("{}{}\n", a, c)
@@ -536,7 +536,7 @@ impl<T: OptFields> Jump<T> {
             },
             self.distance
         );
-        if self.opt.fields().len() > 0 {
+        if !self.opt.fields().is_empty() {
             let b: Vec<String> = self.opt.fields().iter().map(|a| a.to_string1()).collect();
             let c = b.join("\t");
             format!("{}{}\n", a, c)
@@ -613,7 +613,7 @@ impl<T: OptFields> Edges<T> {
 
         write!(&mut a, "\t{}", self.alignment).unwrap();
 
-        if self.opts.fields().len() > 0 {
+        if !self.opts.fields().is_empty() {
             let b: Vec<String> = self.opts.fields().iter().map(|a| a.to_string1()).collect();
             let c = b.join("\t");
             format!("{}{}\n", a, c)
@@ -649,6 +649,12 @@ pub struct Gfa<T: OptFields> {
     pub groups: Vec<Group>,
     pub gaps: Vec<Gap<T>>,
     pub string2index: HashMap<String, usize>,
+}
+
+impl<T: OptFields> Default for Gfa<T> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<T: OptFields> Gfa<T> {
@@ -694,7 +700,7 @@ impl<T: OptFields> Gfa<T> {
     ///     - Option<usize>: The minimum node id
     pub fn check_nc(&mut self) -> Option<Vec<usize>> {
         // If the graph has no nodes -> returns false
-        if self.segments.len() == 0 {
+        if self.segments.is_empty() {
             return None;
         }
 
@@ -729,7 +735,7 @@ impl<T: OptFields> Gfa<T> {
                 return Some(numeric_nodes);
             }
         }
-        return None;
+        None
     }
 
     /// Read the graph from a file
@@ -759,9 +765,9 @@ impl<T: OptFields> Gfa<T> {
             for line in reader.lines() {
                 let l = line.unwrap();
                 let l2 = l.clone();
-                let mut a = l2.split("\t");
+                let mut a = l2.split('\t');
                 let first = a.next().unwrap();
-                let line_split: Vec<&str> = l.split("\t").collect();
+                let line_split: Vec<&str> = l.split('\t').collect();
                 match first {
                     "S" => {
                         let name = a.next().unwrap().parse().unwrap();
@@ -788,7 +794,7 @@ impl<T: OptFields> Gfa<T> {
                     "P" => {
                         let name: String = String::from(line_split[1]);
                         let dirs: Vec<bool> = line_split[2]
-                            .split(",")
+                            .split(',')
                             .map(|d| {
                                 if &d[d.len() - 1..] == "+" {
                                     !false
@@ -798,23 +804,23 @@ impl<T: OptFields> Gfa<T> {
                             })
                             .collect();
                         let node_id: Vec<String> = line_split[2]
-                            .split(",")
+                            .split(',')
                             .map(|d| d[..d.len() - 1].parse().unwrap())
                             .collect();
                         let overlap;
                         if line_split.len() > 3 {
                             overlap = line_split[3]
-                                .split(",")
+                                .split(',')
                                 .map(|d| d.parse().unwrap())
                                 .collect();
                         } else {
                             overlap = vec!["*".to_string(); node_id.len()];
                         }
                         self.paths.push(Path {
-                            name: name,
+                            name,
                             dir: dirs,
                             nodes: node_id,
-                            overlap: overlap,
+                            overlap,
                         });
                     }
                     "L" => {
@@ -871,7 +877,7 @@ impl<T: OptFields> Gfa<T> {
                         let seq_end = a.next().unwrap().parse().unwrap();
                         let walk = a.next().unwrap().to_string();
                         let dirs: Vec<bool> = walk
-                            .split(",")
+                            .split(',')
                             .map(|d| {
                                 if &d[d.len() - 1..] == ">" {
                                     !false
@@ -881,7 +887,7 @@ impl<T: OptFields> Gfa<T> {
                             })
                             .collect();
                         let node_id: Vec<String> = walk
-                            .split(",")
+                            .split(',')
                             .map(|d| d[..d.len() - 1].parse().unwrap())
                             .collect();
                         self.walk.push(Walk {
@@ -910,9 +916,9 @@ impl<T: OptFields> Gfa<T> {
                         let distance = a.next().unwrap().to_string();
                         self.jumps.push(Jump {
                             from,
-                            from_orient: from_orient,
+                            from_orient,
                             to,
-                            to_orient: to_orient,
+                            to_orient,
                             distance,
                             opt: T::parse(a),
                         });
@@ -961,24 +967,24 @@ impl<T: OptFields> Gfa<T> {
 
                         let mut end = 0;
                         let source_begin: String = a.next().unwrap().parse().unwrap();
-                        end = if source_begin.ends_with("$") {
+                        end = if source_begin.ends_with('$') {
                             end & 1
                         } else {
                             end
                         };
-                        let s1 = source_begin.replace("$", "").parse().unwrap();
+                        let s1 = source_begin.replace('$', "").parse().unwrap();
 
                         let s2: String = a.next().unwrap().parse().unwrap();
-                        end = if s2.ends_with("$") { end & 2 } else { end };
-                        let s2 = s2.replace("$", "").parse().unwrap();
+                        end = if s2.ends_with('$') { end & 2 } else { end };
+                        let s2 = s2.replace('$', "").parse().unwrap();
 
                         let s3: String = a.next().unwrap().parse().unwrap();
-                        end = if s3.ends_with("$") { end & 4 } else { end };
-                        let s3 = s3.replace("$", "").parse().unwrap();
+                        end = if s3.ends_with('$') { end & 4 } else { end };
+                        let s3 = s3.replace('$', "").parse().unwrap();
 
                         let s4: String = a.next().unwrap().parse().unwrap();
-                        end = if s4.ends_with("$") { end & 8 } else { end };
-                        let s4 = s4.replace("$", "").parse().unwrap();
+                        end = if s4.ends_with('$') { end & 8 } else { end };
+                        let s4 = s4.replace('$', "").parse().unwrap();
 
                         let alignment = a.next().unwrap().to_string();
 
@@ -986,14 +992,14 @@ impl<T: OptFields> Gfa<T> {
                             id,
                             source_name: source_name.to_string(),
                             sink_name: sink_name.to_string(),
-                            source_dir: source_dir,
-                            sink_dir: sink_dir,
+                            source_dir,
+                            sink_dir,
                             source_begin: s1,
                             source_end: s2,
                             sink_begin: s3,
                             sink_end: s4,
                             ends: end,
-                            alignment: alignment,
+                            alignment,
                             opts: T::parse(a),
                         });
                     }
@@ -1003,16 +1009,16 @@ impl<T: OptFields> Gfa<T> {
                         let nodes: Vec<(&str, bool)> = a
                             .next()
                             .unwrap()
-                            .split(" ")
+                            .split(' ')
                             .map(|d| split_string(d).unwrap())
                             .collect();
                         let (nodes, direction): (Vec<&str>, Vec<bool>) =
                             nodes.iter().cloned().unzip();
                         self.groups.push(Group {
                             is_ordered,
-                            direction: direction,
+                            direction,
                             nodes: nodes.iter().map(|a| a.to_string()).collect(),
-                            name: name,
+                            name,
                         });
                     }
                     "U" => {
@@ -1021,16 +1027,16 @@ impl<T: OptFields> Gfa<T> {
                         let nodes: Vec<(&str, bool)> = a
                             .next()
                             .unwrap()
-                            .split(" ")
+                            .split(' ')
                             .map(|d| split_string(d).unwrap())
                             .collect();
                         let (nodes, direction): (Vec<&str>, Vec<bool>) =
                             nodes.iter().cloned().unzip();
                         self.groups.push(Group {
                             is_ordered,
-                            direction: direction,
+                            direction,
                             nodes: nodes.iter().map(|a| a.to_string()).collect(),
-                            name: name,
+                            name,
                         });
                     }
 
@@ -1069,7 +1075,7 @@ impl<T: OptFields> Gfa<T> {
     pub fn convert_to_ncgraph(&self, graph: &Gfa<T>) -> NCGfa<T> {
         let mut ncgraph: NCGfa<T> = NCGfa::new();
         let f = ncgraph.make_mapper(graph);
-        ncgraph.convert_with_mapper(f, &graph);
+        ncgraph.convert_with_mapper(f, graph);
         ncgraph
     }
 }
@@ -1107,7 +1113,7 @@ impl<T: OptFields> NCNode<T> {
     fn to_string(&self) -> String {
         let a = format!("S\t{}\t{}\n", self.id, self.seq.len());
 
-        if self.opt.fields().len() > 0 {
+        if !self.opt.fields().is_empty() {
             let b: Vec<String> = self.opt.fields().iter().map(|a| a.to_string1()).collect();
             let c = b.join("\t");
             format!("{}{}\n", a, c)
@@ -1167,7 +1173,7 @@ impl<T: OptFields> NCEdge<T> {
             },
             self.overlap
         );
-        if self.opt.fields().len() > 0 {
+        if !self.opt.fields().is_empty() {
             let b: Vec<String> = self.opt.fields().iter().map(|a| a.to_string1()).collect();
             let c = b.join("\t");
             format!("{}{}\n", a, c)
@@ -1193,7 +1199,7 @@ impl NCPath {
     pub fn to_string(&self, mapper: &Option<Vec<&String>>) -> String {
         let a = format!("P\t{}\t", self.name);
         let vec: Vec<String>;
-        if Some(mapper) != None {
+        if Some(mapper).is_some() {
             vec = self
                 .nodes
                 .iter()
@@ -1252,6 +1258,12 @@ impl NCPath {
     }
 }
 
+impl<T: OptFields> Default for NCGfa<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T: OptFields> NCGfa<T> {
     /// NGraph constructor
     ///
@@ -1302,10 +1314,10 @@ impl<T: OptFields> NCGfa<T> {
             // Iterate over lines
             for line in reader.lines() {
                 let l = line.unwrap();
-                let line_split: Vec<&str> = l.split("\t").collect();
+                let line_split: Vec<&str> = l.split('\t').collect();
                 match line_split[0] {
                     "S" => {
-                        let mut a = l.split("\t");
+                        let mut a = l.split('\t');
                         a.next();
 
                         nodes.push(NCNode {
@@ -1317,7 +1329,7 @@ impl<T: OptFields> NCGfa<T> {
                     "P" => {
                         let name: String = String::from(line_split[1]);
                         let dirs: Vec<bool> = line_split[2]
-                            .split(",")
+                            .split(',')
                             .map(|d| {
                                 if &d[d.len() - 1..] == "+" {
                                     !false
@@ -1327,28 +1339,28 @@ impl<T: OptFields> NCGfa<T> {
                             })
                             .collect();
                         let node_id: Vec<u32> = line_split[2]
-                            .split(",")
+                            .split(',')
                             .map(|d| d[..d.len() - 1].parse().unwrap())
                             .collect();
                         let overlap;
                         if line_split.len() > 3 {
                             overlap = line_split[3]
-                                .split(",")
+                                .split(',')
                                 .map(|d| d.parse().unwrap())
                                 .collect();
                         } else {
                             overlap = vec!["*".to_string(); node_id.len()];
                         }
                         self.paths.push(NCPath {
-                            name: name,
+                            name,
                             dir: dirs,
                             nodes: node_id,
-                            overlap: overlap,
+                            overlap,
                         });
                     }
                     "L" => {
                         if edge {
-                            let mut a = l.split("\t");
+                            let mut a = l.split('\t');
                             a.next();
                             //edges.push(Edge{from: line_split[1].parse().unwrap(), from_dir: if line_split[2] == "+" { !false } else { !true }, to: line_split[3].parse().unwrap(), to_dir: if line_split[4] == "+" { !false } else { !true }, overlap: line_split[5].parse().unwrap(), opt: T::parse(line_split)});
                             edges.push(NCEdge {
@@ -1359,11 +1371,7 @@ impl<T: OptFields> NCGfa<T> {
                                     !true
                                 },
                                 to: a.next().unwrap().parse().unwrap(),
-                                to_dir: if a.next().unwrap() == "+" {
-                                    true
-                                } else {
-                                    false
-                                },
+                                to_dir: a.next().unwrap() == "+",
                                 overlap: a.next().unwrap().to_string(),
                                 opt: T::parse(a),
                             });
@@ -1371,7 +1379,7 @@ impl<T: OptFields> NCGfa<T> {
                     }
                     "C" => {
                         if edge {
-                            let mut a = l.split("\t");
+                            let mut a = l.split('\t');
                             a.next();
                             //edges.push(Edge{from: line_split[1].parse().unwrap(), from_dir: if line_split[2] == "+" { !false } else { !true }, to: line_split[3].parse().unwrap(), to_dir: if line_split[4] == "+" { !false } else { !true }, overlap: line_split[5].parse().unwrap(), opt: T::parse(line_split)});
                             edges.push(NCEdge {
@@ -1448,7 +1456,7 @@ impl<T: OptFields> NCGfa<T> {
             .segments
             .iter()
             .map(|x| NCNode {
-                id: mapper.get(&x.name).unwrap().clone() as u32,
+                id: *mapper.get(&x.name).unwrap() as u32,
                 seq: x.sequence.clone(),
                 opt: x.opt.clone(),
             })
@@ -1462,10 +1470,10 @@ impl<T: OptFields> NCGfa<T> {
                     value
                         .iter()
                         .map(|x| NCEdge {
-                            from: mapper.get(&x.from).unwrap().clone() as u32,
-                            from_dir: x.from_dir.clone(),
-                            to: mapper.get(&x.to).unwrap().clone() as u32,
-                            to_dir: x.to_dir.clone(),
+                            from: *mapper.get(&x.from).unwrap() as u32,
+                            from_dir: x.from_dir,
+                            to: *mapper.get(&x.to).unwrap() as u32,
+                            to_dir: x.to_dir,
                             overlap: "".to_string(),
                             opt: x.opt.clone(),
                         })
@@ -1483,7 +1491,7 @@ impl<T: OptFields> NCGfa<T> {
                 nodes: x
                     .nodes
                     .iter()
-                    .map(|y| mapper.get(y).unwrap().clone() as u32)
+                    .map(|y| *mapper.get(y).unwrap() as u32)
                     .collect(),
                 overlap: x.overlap.clone(),
             })
@@ -1527,7 +1535,7 @@ impl<T: OptFields> NCGfa<T> {
                 return false;
             }
         }
-        return true;
+        true
     }
 
     /// Remove the mapper if not needed
@@ -1558,7 +1566,7 @@ pub fn vec_check_start(node: &Vec<usize>) -> bool {
     if mm == 1 {
         return true;
     }
-    return false;
+    false
 }
 
 /// Create a numeric vector from a vector of strings
@@ -1590,7 +1598,7 @@ fn get_version(file_path: &str) -> f32 {
     let first_line = reader.lines().next().unwrap().unwrap();
     let line = first_line.split_whitespace().nth(1).unwrap();
     let version_number = line.split(':').nth(2).unwrap().to_string();
-    return version_number.parse::<f32>().unwrap();
+    version_number.parse::<f32>().unwrap()
 }
 
 fn split_string(input_string: &str) -> Option<(&str, bool)> {
@@ -1598,11 +1606,7 @@ fn split_string(input_string: &str) -> Option<(&str, bool)> {
 
     if len >= 1 {
         let first_substring = &input_string[0..len - 1];
-        let last_letter = if &input_string[len - 1..] == "+" {
-            true
-        } else {
-            false
-        };
+        let last_letter = &input_string[len - 1..] == "+";
 
         Some((first_substring, last_letter))
     } else {
@@ -1742,7 +1746,7 @@ impl<'a, T: IsPath> Pansn<'a, T> {
         let mut result = Vec::new();
         for x in self.genomes.iter() {
             for y in x.haplotypes.iter() {
-                let kk: Vec<&T> = y.paths.iter().map(|i| *i).collect();
+                let kk: Vec<&T> = y.paths.to_vec();
                 result.push((x.name.clone() + "#" + &y.name, kk));
             }
         }
@@ -1755,7 +1759,7 @@ impl<'a, T: IsPath> Pansn<'a, T> {
         for x in self.genomes.iter() {
             let mut aa = Vec::new();
             for y in x.haplotypes.iter() {
-                let kk: Vec<&T> = y.paths.iter().map(|i| *i).collect();
+                let kk: Vec<&T> = y.paths.to_vec();
                 aa.extend(kk);
             }
             result.push((x.name.clone(), aa));
@@ -1773,6 +1777,6 @@ impl<'a, T: IsPath> Pansn<'a, T> {
                     .for_each(|i| result.push((i.get_name().to_string(), vec![*i])))
             }
         }
-        return result;
+        result
     }
 }
