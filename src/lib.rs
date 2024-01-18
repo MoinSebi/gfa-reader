@@ -1735,7 +1735,6 @@ impl<'a, T: IsPath> Pansn<'a, T> {
                         haplotypes: vec![haplo],
                     };
                     genomes.push(genome);
-                    println!("Did not find the specific string.");
                 }
             }
         }
