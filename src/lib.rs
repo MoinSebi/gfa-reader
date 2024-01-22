@@ -1153,7 +1153,7 @@ impl NCPath {
                 .iter()
                 .zip(&self.dir)
                 .map(|n| {
-                    format!("{}{}", mapper.as_ref().unwrap()[*n.0 as usize], {
+                    format!("{}{}", mapper.as_ref().unwrap()[*n.0 as usize-1], {
                         if *n.1 {
                             "+".to_string()
                         } else {
