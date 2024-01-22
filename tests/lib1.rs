@@ -72,7 +72,7 @@ fn read_gfa_convert_nodes() {
     // Example data
     let filename = "data/size5.gfa";
     let mut graph: NCGfa<()> = NCGfa::new();
-    graph.parse_gfa_file_direct(filename, false);
+    graph.parse_gfa_file(filename, false);
     assert_eq!(graph.nodes[9].opt, ());
     assert_eq!(graph.nodes[1 - 1].id, 1);
 }
@@ -98,7 +98,7 @@ fn read_ncgfa_nodes() {
     // Example data
     let filename = "data/size5.gfa";
     let mut graph: NCGfa<()> = NCGfa::new();
-    graph.parse_gfa_file_direct(filename, false);
+    graph.parse_gfa_file(filename, false);
     assert_eq!(graph.nodes[9].opt, ());
     assert_eq!(graph.nodes[1 - 1].id, 1);
 }
@@ -134,5 +134,5 @@ fn convert_gfa_ncgfa3() {
     // Example data
     let filename = "data/size5.gfa";
     let mut graph: NCGfa<()> = NCGfa::new();
-    graph.parse_gfa_file_direct(filename, false);
+    graph.parse_gfa_file(filename, false);
 }

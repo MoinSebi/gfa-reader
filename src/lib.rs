@@ -123,7 +123,7 @@ pub struct Segment<T: OptFields> {
 
 impl<T: OptFields> Segment<T> {
     /// Write node to string
-    fn to_string(&self) -> String {
+    fn to_string1(&self) -> String {
         let a = format!("S\t{}\t{}\n", self.name, self.sequence.len());
 
         if !self.opt.fields().is_empty() {
@@ -274,7 +274,7 @@ pub struct Path {
 
 impl Path {
     /// Write path to string (GFA1 format)
-    fn to_string(&self) -> String {
+    fn to_string1(&self) -> String {
         let a = format!("P\t{}\t", self.name);
         let f1: Vec<String> = self
             .nodes
@@ -319,7 +319,7 @@ impl Walk {
     #[allow(dead_code)]
     /// Write path to string (GFA1 format)
     /// v1.1
-    fn to_string(&self) -> String {
+    fn to_string1(&self) -> String {
         let a = format!(
             "W\t{}\t{}\t{}\t{}\t{}",
             self.sample_id, self.hap_index, self.seq_id, self.seq_start, self.seq_end
@@ -360,7 +360,7 @@ impl<T: OptFields> Fragment<T> {
     #[allow(dead_code)]
     /// Write fragment to string (GFA1 format)
     /// v2
-    fn to_string(&self) -> String {
+    fn to_string2(&self) -> String {
         let a = format!(
             "F\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             self.sample_id,
@@ -428,7 +428,7 @@ impl Group {
 
     /// Write group to string (GFA1 format)
     /// P line in GFA1
-    pub fn to_string(&self) -> String {
+    pub fn to_string1(&self) -> String {
         let mut a = format!("{}\t", "P");
         a = format!("{}\t{}", a, self.name);
         if self.is_ordered {
@@ -469,7 +469,7 @@ pub struct Gap<T: OptFields> {
 impl<T: OptFields> Gap<T> {
     #[allow(dead_code)]
     /// Write path to string (GFA2 format)
-    fn to_string(&self) -> String {
+    fn to_string1(&self) -> String {
         let a = format!(
             "G\t{}\t{}{}\t{}{}\t{}\n",
             self.name,
@@ -515,7 +515,7 @@ impl<T: OptFields> Jump<T> {
     #[allow(dead_code)]
     /// Write path to string (GFA1 format)
     /// v1.2
-    fn to_string(&self) -> String {
+    fn to_string1(&self) -> String {
         let a = format!(
             "J\t{}\t{}\t{}\t{}\t{}\n",
             self.from,
@@ -591,7 +591,7 @@ impl<T: OptFields> Edges<T> {
             },
             self.source_begin
         );
-        if &self.ends & &1 != 0 {
+        if &self.ends & 1 != 0 {
             a.push('$');
         }
         use std::fmt::Write;
@@ -794,27 +794,20 @@ impl<T: OptFields> Gfa<T> {
                         let name: String = String::from(line_split[1]);
                         let dirs: Vec<bool> = line_split[2]
                             .split(',')
-                            .map(|d| {
-                                if &d[d.len() - 1..] == "+" {
-                                    !false
-                                } else {
-                                    !true
-                                }
-                            })
+                            .map(|d| &d[d.len() - 1..] == "+")
                             .collect();
                         let node_id: Vec<String> = line_split[2]
                             .split(',')
                             .map(|d| d[..d.len() - 1].parse().unwrap())
                             .collect();
-                        let overlap;
-                        if line_split.len() > 3 {
-                            overlap = line_split[3]
+                        let overlap = if line_split.len() > 3 {
+                            line_split[3]
                                 .split(',')
                                 .map(|d| d.parse().unwrap())
-                                .collect();
+                                .collect()
                         } else {
-                            overlap = vec!["*".to_string(); node_id.len()];
-                        }
+                            vec!["*".to_string(); node_id.len()]
+                        };
                         self.paths.push(Path {
                             name,
                             dir: dirs,
@@ -827,17 +820,9 @@ impl<T: OptFields> Gfa<T> {
                             //edges.push(Edge{from: line_split[1].parse().unwrap(), from_dir: if line_split[2] == "+" { !false } else { !true }, to: line_split[3].parse().unwrap(), to_dir: if line_split[4] == "+" { !false } else { !true }, overlap: line_split[5].parse().unwrap(), opt: T::parse(line_split)});
                             links.push(Link {
                                 from: a.next().unwrap().to_string(),
-                                from_dir: if a.next().unwrap() == "+" {
-                                    !false
-                                } else {
-                                    !true
-                                },
+                                from_dir: a.next().unwrap() == "+",
                                 to: a.next().unwrap().to_string(),
-                                to_dir: if a.next().unwrap() == "+" {
-                                    !false
-                                } else {
-                                    !true
-                                },
+                                to_dir: a.next().unwrap() == "+",
                                 overlap: a.next().unwrap().to_string(),
                                 opt: T::parse(a),
                             });
@@ -847,17 +832,9 @@ impl<T: OptFields> Gfa<T> {
                         if edges {
                             self.containments.push(Containment {
                                 container: a.next().unwrap().to_string(),
-                                container_orient: if a.next().unwrap() == "+" {
-                                    !false
-                                } else {
-                                    !true
-                                },
+                                container_orient: a.next().unwrap() == "+",
                                 contained: a.next().unwrap().to_string(),
-                                contained_orient: if a.next().unwrap() == "+" {
-                                    !false
-                                } else {
-                                    !true
-                                },
+                                contained_orient: a.next().unwrap() == "+",
                                 overlap: a.next().unwrap().to_string(),
                                 opt: T::parse(a),
                                 pos: 0,
@@ -875,16 +852,8 @@ impl<T: OptFields> Gfa<T> {
                         let seq_start = a.next().unwrap().parse().unwrap();
                         let seq_end = a.next().unwrap().parse().unwrap();
                         let walk = a.next().unwrap().to_string();
-                        let dirs: Vec<bool> = walk
-                            .split(',')
-                            .map(|d| {
-                                if &d[d.len() - 1..] == ">" {
-                                    !false
-                                } else {
-                                    !true
-                                }
-                            })
-                            .collect();
+                        let dirs: Vec<bool> =
+                            walk.split(',').map(|d| &d[d.len() - 1..] == ">").collect();
                         let node_id: Vec<String> = walk
                             .split(',')
                             .map(|d| d[..d.len() - 1].parse().unwrap())
@@ -901,17 +870,9 @@ impl<T: OptFields> Gfa<T> {
                     }
                     "J" => {
                         let from = a.next().unwrap().to_string();
-                        let from_orient = if a.next().unwrap() == "+" {
-                            !false
-                        } else {
-                            !true
-                        };
+                        let from_orient = a.next().unwrap() == "+";
                         let to = a.next().unwrap().to_string();
-                        let to_orient = if a.next().unwrap() == "+" {
-                            !false
-                        } else {
-                            !true
-                        };
+                        let to_orient = a.next().unwrap() == "+";
                         let distance = a.next().unwrap().to_string();
                         self.jumps.push(Jump {
                             from,
@@ -1056,18 +1017,16 @@ impl<T: OptFields> Gfa<T> {
 
         write!(f, "{}", self.header.to_string1()).expect("Not able to write");
         for node in self.segments.iter() {
-            write!(f, "{}", node.to_string()).expect("Not able to write");
+            write!(f, "{}", node.to_string1()).expect("Not able to write");
         }
-        match &self.links {
-            Some(value) => {
-                for edge in value.iter() {
-                    write!(f, "{}", edge.to_string_link()).expect("Not able to write");
-                }
+        if let Some(value) = &self.links {
+            for edge in value.iter() {
+                write!(f, "{}", edge.to_string_link()).expect("Not able to write");
             }
-            _ => {}
         }
+
         for path in self.paths.iter() {
-            write!(f, "{}", path.to_string()).expect("Not able to write");
+            write!(f, "{}", path.to_string1()).expect("Not able to write");
         }
     }
 
@@ -1109,16 +1068,15 @@ pub struct NCNode<T: OptFields> {
 
 impl<T: OptFields> NCNode<T> {
     /// Write node to string
-    fn to_string(&self) -> String {
+    fn to_string1(&self) -> String {
         let a = format!("S\t{}\t{}\n", self.id, self.seq.len());
 
         if !self.opt.fields().is_empty() {
             let b: Vec<String> = self.opt.fields().iter().map(|a| a.to_string1()).collect();
             let c = b.join("\t");
-            format!("{}{}\n", a, c)
-        } else {
-            a
+            return format!("{}{}\n", a, c);
         }
+        a
     }
 
     #[allow(dead_code)]
@@ -1190,10 +1148,8 @@ pub struct NCPath {
 impl NCPath {
     pub fn to_string(&self, mapper: &Option<Vec<String>>) -> String {
         let a = format!("P\t{}\t", self.name);
-        let vec: Vec<String>;
-        if Some(mapper).is_some() {
-            vec = self
-                .nodes
+        let vec: Vec<String> = if Some(mapper).is_some() {
+            self.nodes
                 .iter()
                 .zip(&self.dir)
                 .map(|n| {
@@ -1205,10 +1161,9 @@ impl NCPath {
                         }
                     })
                 })
-                .collect();
+                .collect()
         } else {
-            vec = self
-                .nodes
+            self.nodes
                 .iter()
                 .zip(&self.dir)
                 .map(|n| {
@@ -1220,13 +1175,12 @@ impl NCPath {
                         }
                     })
                 })
-                .collect();
-        }
+                .collect()
+        };
 
         let f2 = vec.join(",");
         format!("{}\t{}\n", a, f2)
     }
-
 }
 
 impl<T: OptFields> Default for NCGfa<T> {
@@ -1263,12 +1217,13 @@ impl<T: OptFields> NCGfa<T> {
     ///
     /// # Example
     ///
-    /// ```rust, ignore
+    /// ```rust
     /// use gfa_reader::Gfa;
-    /// let mut graph = Gfa::new();
-    /// graph.parse_gfa_file("/path/to/graph");
-    /// ´´´
-    pub fn parse_gfa_file_direct(&mut self, file_name: &str, edge: bool) {
+    /// let mut graph: Gfa<()> = Gfa::new();
+    /// graph.parse_gfa_file("data/example_data/size5.gfa", false);
+    /// ```
+    ///
+    pub fn parse_gfa_file(&mut self, file_name: &str, edge: bool) {
         if file_path::new(file_name).exists() {
             let file = File::open(file_name).expect("ERROR: CAN NOT READ FILE\n");
 
@@ -1301,27 +1256,21 @@ impl<T: OptFields> NCGfa<T> {
                         let name: String = String::from(line_split[1]);
                         let dirs: Vec<bool> = line_split[2]
                             .split(',')
-                            .map(|d| {
-                                if &d[d.len() - 1..] == "+" {
-                                    !false
-                                } else {
-                                    !true
-                                }
-                            })
+                            .map(|d| &d[d.len() - 1..] == "+")
                             .collect();
                         let node_id: Vec<u32> = line_split[2]
                             .split(',')
                             .map(|d| d[..d.len() - 1].parse().unwrap())
                             .collect();
-                        let overlap;
-                        if line_split.len() > 3 {
-                            overlap = line_split[3]
+
+                        let overlap: Vec<_> = if line_split.len() > 3 {
+                            line_split[3]
                                 .split(',')
                                 .map(|d| d.parse().unwrap())
-                                .collect();
+                                .collect()
                         } else {
-                            overlap = vec!["*".to_string(); node_id.len()];
-                        }
+                            vec!["*".to_string(); node_id.len()]
+                        };
                         self.paths.push(NCPath {
                             name,
                             dir: dirs,
@@ -1336,11 +1285,7 @@ impl<T: OptFields> NCGfa<T> {
                             //edges.push(Edge{from: line_split[1].parse().unwrap(), from_dir: if line_split[2] == "+" { !false } else { !true }, to: line_split[3].parse().unwrap(), to_dir: if line_split[4] == "+" { !false } else { !true }, overlap: line_split[5].parse().unwrap(), opt: T::parse(line_split)});
                             edges.push(NCEdge {
                                 from: a.next().unwrap().parse().unwrap(),
-                                from_dir: if a.next().unwrap() == "+" {
-                                    !false
-                                } else {
-                                    !true
-                                },
+                                from_dir: a.next().unwrap() == "+",
                                 to: a.next().unwrap().parse().unwrap(),
                                 to_dir: a.next().unwrap() == "+",
                                 overlap: a.next().unwrap().to_string(),
@@ -1355,17 +1300,9 @@ impl<T: OptFields> NCGfa<T> {
                             //edges.push(Edge{from: line_split[1].parse().unwrap(), from_dir: if line_split[2] == "+" { !false } else { !true }, to: line_split[3].parse().unwrap(), to_dir: if line_split[4] == "+" { !false } else { !true }, overlap: line_split[5].parse().unwrap(), opt: T::parse(line_split)});
                             edges.push(NCEdge {
                                 from: a.next().unwrap().parse().unwrap(),
-                                from_dir: if a.next().unwrap() == "+" {
-                                    !false
-                                } else {
-                                    !true
-                                },
+                                from_dir: a.next().unwrap() == "+",
                                 to: a.next().unwrap().parse().unwrap(),
-                                to_dir: if a.next().unwrap() == "+" {
-                                    !false
-                                } else {
-                                    !true
-                                },
+                                to_dir: a.next().unwrap() == "+",
                                 overlap: a.next().unwrap().to_string(),
                                 opt: T::parse(a),
                             });
@@ -1435,23 +1372,20 @@ impl<T: OptFields> NCGfa<T> {
         nodes.sort_by_key(|a| a.id);
         self.nodes = nodes;
         self.edges = None;
-        match &graph.links {
-            Some(value) => {
-                self.edges = Some(
-                    value
-                        .iter()
-                        .map(|x| NCEdge {
-                            from: *mapper.get(&x.from).unwrap() as u32,
-                            from_dir: x.from_dir,
-                            to: *mapper.get(&x.to).unwrap() as u32,
-                            to_dir: x.to_dir,
-                            overlap: "".to_string(),
-                            opt: x.opt.clone(),
-                        })
-                        .collect(),
-                );
-            }
-            _ => {}
+        if let Some(value) = &graph.links {
+            self.edges = Some(
+                value
+                    .iter()
+                    .map(|x| NCEdge {
+                        from: *mapper.get(&x.from).unwrap() as u32,
+                        from_dir: x.from_dir,
+                        to: *mapper.get(&x.to).unwrap() as u32,
+                        to_dir: x.to_dir,
+                        overlap: "".to_string(),
+                        opt: x.opt.clone(),
+                    })
+                    .collect(),
+            );
         }
         self.paths = graph
             .paths
@@ -1493,16 +1427,14 @@ impl<T: OptFields> NCGfa<T> {
 
         write!(f, "{}", self.header.to_string1()).expect("Not able to write");
         for node in self.nodes.iter() {
-            write!(f, "{}", node.to_string()).expect("Not able to write");
+            write!(f, "{}", node.to_string1()).expect("Not able to write");
         }
-        match &self.edges {
-            Some(value) => {
-                for edge in value.iter() {
-                    write!(f, "{}", edge.to_string_link()).expect("Not able to write");
-                }
+        if let Some(value) = &self.edges {
+            for edge in value.iter() {
+                write!(f, "{}", edge.to_string_link()).expect("Not able to write");
             }
-            _ => {}
         }
+
         for path in self.paths.iter() {
             write!(f, "{}", path.to_string(&self.mapper)).expect("Not able to write");
         }
@@ -1514,8 +1446,10 @@ impl<T: OptFields> NCGfa<T> {
             Some(map) => {
                 // You have access to the HashMap here
 
-                return map.iter().enumerate().all(|(i, x)| (i + 1).to_string() == *x);
-
+                return map
+                    .iter()
+                    .enumerate()
+                    .all(|(i, x)| (i + 1).to_string() == *x);
             }
             None => {
                 // Handle the None case here
@@ -1533,7 +1467,7 @@ impl<T: OptFields> NCGfa<T> {
 }
 
 /// Does this vector contain only digits
-pub fn vec_is_digit(nodes: &Vec<&str>) -> bool {
+pub fn vec_is_digit(nodes: &[&str]) -> bool {
     nodes
         .iter()
         .map(|x| {
@@ -1547,7 +1481,7 @@ pub fn vec_is_digit(nodes: &Vec<&str>) -> bool {
 }
 
 /// Check if the vector starts at 1
-pub fn vec_check_start(node: &Vec<usize>) -> bool {
+pub fn vec_check_start(node: &[usize]) -> bool {
     let mm = node.iter().cloned().min().unwrap();
     if mm == 1 {
         return true;
@@ -1556,7 +1490,7 @@ pub fn vec_check_start(node: &Vec<usize>) -> bool {
 }
 
 /// Create a numeric vector from a vector of strings
-pub fn create_sort_numeric(nodes: &Vec<&str>) -> Vec<usize> {
+pub fn create_sort_numeric(nodes: &[&str]) -> Vec<usize> {
     let mut numeric_nodes = nodes
         .iter()
         .map(|x| x.parse::<usize>().unwrap())
@@ -1565,9 +1499,8 @@ pub fn create_sort_numeric(nodes: &Vec<&str>) -> Vec<usize> {
     numeric_nodes
 }
 
-
 /// Check if the vector is compact
-pub fn vec_is_compact(numeric_nodes: &Vec<usize>) -> bool {
+pub fn vec_is_compact(numeric_nodes: &[usize]) -> bool {
     numeric_nodes.windows(2).all(|pair| pair[1] == &pair[0] + 1)
 }
 
@@ -1666,6 +1599,12 @@ pub struct Haplotype<'a, T: IsPath> {
     pub paths: Vec<&'a T>,
 }
 
+impl<'a, T: IsPath> Default for Pansn<'a, T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<'a, T: IsPath> Pansn<'a, T> {
     /// Create a new Pansn
     ///
@@ -1691,14 +1630,19 @@ impl<'a, T: IsPath> Pansn<'a, T> {
     /// let pansn: Pansn<Path> = Pansn::from_graph(&graph.paths, " ");
     /// println!("{:?}", pansn);
     /// ```
-    pub fn from_graph(paths: &'a Vec<T>, del: &str) -> Self {
+    pub fn from_graph(paths: &'a [T], del: &str) -> Self {
         let mut genomes: Vec<Sample<'a, T>> = Vec::new();
 
         // All path names
         let a: Vec<String> = paths.iter().map(|x| x.get_name().to_string()).collect();
 
         // Check if all path names are in Pansn-spec
-        let b = a.iter().map(|x| x.split(del).collect::<Vec<&str>>().len()).collect::<Vec<usize>>().iter().all(|&x| x == 3);
+        let b = a
+            .iter()
+            .map(|x| x.split(del).collect::<Vec<&str>>().len())
+            .collect::<Vec<usize>>()
+            .iter()
+            .all(|&x| x == 3);
 
         // If no del -> one path is one haplotype, is one genome
         if del == " " || !b {
@@ -1809,9 +1753,12 @@ impl<'a, T: IsPath> Pansn<'a, T> {
         result
     }
 
-    pub fn number_of_pansn(&self){
+    pub fn number_of_pansn(&self) {
         println!("Number of genomes: {}", self.get_path_genome().len());
-        println!("Number of individual haplotypes: {}", self.get_haplo_path().len());
+        println!(
+            "Number of individual haplotypes: {}",
+            self.get_haplo_path().len()
+        );
         println!("Total number of paths: {}", self.get_paths_direct().len());
     }
 }
