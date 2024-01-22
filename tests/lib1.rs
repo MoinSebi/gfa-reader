@@ -1,7 +1,9 @@
 use gfa_reader::{Gfa, Link, NCGfa, Pansn, Path};
 
 #[test]
-/// Check full header
+/// Read GFA
+/// -  nodes
+/// - pansn
 fn read_gfa_header() {
     eprintln!("Read gfa");
     // Example data
@@ -14,6 +16,9 @@ fn read_gfa_header() {
 }
 
 #[test]
+/// Read GFA
+/// - edges
+/// - pansn
 fn read_gfa_edges() {
     eprintln!("Read gfa");
     // Example data

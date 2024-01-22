@@ -1638,8 +1638,9 @@ impl IsPath for NCPath {
 #[derive(Debug, Clone)]
 /// PanSN-spec path data structure
 ///
-/// ```
 ///
+/// Example
+/// ```
 /// use gfa_reader::{Gfa, Pansn, Path};
 ///
 /// let mut graph: Gfa<()> = Gfa::new();
@@ -1669,12 +1670,41 @@ pub struct Haplotype<'a, T: IsPath> {
 }
 
 impl<'a, T: IsPath> Pansn<'a, T> {
+    /// Create a new Pansn
+    ///
+    /// Empty
+    ///
+    /// ```
+    /// use gfa_reader::{IsPath, Pansn, Path};
+    /// let pansn: Pansn<Path> = Pansn::new();
+    /// ```
+    ///
+    pub fn new() -> Self {
+        Self {
+            genomes: Vec::new(),
+        }
+    }
+
     /// Create Pansn from a list of paths
+    /// ```
+    /// use gfa_reader::{Gfa, Pansn, Path};
+    ///
+    /// let mut graph: Gfa<()> = Gfa::new();
+    /// graph.parse_gfa_file("data/size5.gfa", false);
+    /// let pansn: Pansn<Path> = Pansn::from_graph(&graph.paths, " ");
+    /// println!("{:?}", pansn);
+    /// ```
     pub fn from_graph(paths: &'a Vec<T>, del: &str) -> Self {
         let mut genomes: Vec<Sample<'a, T>> = Vec::new();
 
-        // If no del -> one path is one haplotype is one path
-        if del == " " {
+        // All path names
+        let a: Vec<String> = paths.iter().map(|x| x.get_name().to_string()).collect();
+
+        // Check if all path names are in Pansn-spec
+        let b = a.iter().map(|x| x.split(del).collect::<Vec<&str>>().len()).collect::<Vec<usize>>().iter().all(|&x| x == 3);
+
+        // If no del -> one path is one haplotype, is one genome
+        if del == " " || !b {
             for path in paths.iter() {
                 genomes.push(Sample {
                     name: path.get_name().to_string(),
@@ -1741,6 +1771,7 @@ impl<'a, T: IsPath> Pansn<'a, T> {
         Pansn { genomes }
     }
 
+    /// Get path for each haplotype
     pub fn get_haplo_path(&self) -> Vec<(String, Vec<&'a T>)> {
         let mut result = Vec::new();
         for x in self.genomes.iter() {
@@ -1753,6 +1784,7 @@ impl<'a, T: IsPath> Pansn<'a, T> {
         result
     }
 
+    /// Get path for each genome
     pub fn get_path_genome(&self) -> Vec<(String, Vec<&'a T>)> {
         let mut result = Vec::new();
         for x in self.genomes.iter() {
@@ -1767,6 +1799,7 @@ impl<'a, T: IsPath> Pansn<'a, T> {
         result
     }
 
+    /// Get all path
     pub fn get_paths_direct(&self) -> Vec<(String, Vec<&'a T>)> {
         let mut result = Vec::new();
         for x in self.genomes.iter() {
@@ -1777,5 +1810,11 @@ impl<'a, T: IsPath> Pansn<'a, T> {
             }
         }
         result
+    }
+
+    pub fn number_of_pansn(&self){
+        println!("Number of genomes: {}", self.get_path_genome().len());
+        println!("Number of individual haplotypes: {}", self.get_haplo_path().len());
+        println!("Total number of paths: {}", self.get_paths_direct().len());
     }
 }
