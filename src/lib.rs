@@ -108,10 +108,12 @@ impl OptFields for Vec<OptElem> {
 /// GFA segment line
 ///
 /// Segment or nodes hold sequence
-/// Feature:
-///     - id
-///     - seq
-///     - op
+///
+///```
+/// use gfa_reader::{NCGfa, OptElem};
+/// let mut graph: NCGfa<Vec<OptElem>> = NCGfa::new();
+/// graph.parse_gfa_file("data/size5.gfa", true);
+/// ```
 ///
 /// Sequence are "optional", but are always represented in variation graphs
 pub struct Segment<T: OptFields> {

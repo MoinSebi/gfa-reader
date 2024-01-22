@@ -25,28 +25,35 @@ Several GFA entries have optional fields. Most of the time, these fields are
 not needed for the basic graph structure. Therefore, they can manually read, if needed or left out.
 This option will be set once for all entries, which either parse or don't parse the optional information.
 
-#### Overlaps
-Same is true for Overlaps, they are optional in many GFA entries and can be 
-parsed or not. Mostly they are not needed for the basic graph structure and 
-can be left out as above. 
-
 #### Edges
 In several specific cases, edges are not needed since the graph structure 
-can be shown with the path information. The edges struct is always present, 
-but depending on the parse settings, will never be populated. 
-
-```doctestinjectablerust
-LEER
-```
-## PanSN
-Pan-SN spec is a specification for storing variation graphs in a GFA format. It is strongly supported by gfa-reader with a pansn struct. It allows you to utilize genome, haplotype or path level collections, dependent on the use case.
+can be represented with the path information. The collection of edges are represented as `Option<edge>`, giving the possibiliy to not populate the structure at all of not needed. 
 
 ```rust
-/// use gfa_reader::{Gfa, Pansn, Path};
-///
-/// let mut graph: Gfa<()> = Gfa::new();
-/// graph.parse_gfa_file("data/size5.gfa", false);
-/// let pansn: Pansn<Path> = Pansn::from_graph(&graph.paths, " ");
+use gfa_reader::{NCGfa, OptElem};
+
+// No edges and no optional fields
+let mut graph: NCGfa<()> = NCGfa::new();
+graph.parse_gfa_file("data/size5.gfa", false);
+
+// Edges and no optional fields
+let mut graph: NCGfa<()> = NCGfa::new();
+graph.parse_gfa_file("data/size5.gfa", true);
+
+
+// Edges and optional fields
+let mut graph: NCGfa<Vec<OptElem>> = NCGfa::new();
+graph.parse_gfa_file("data/size5.gfa", true);
+```
+## PanSN
+Pan-SN spec is a specification for storing variation graphs in a GFA format. It is strongly supported by gfa-reader with a pansn struct. It allows you to utilize genome, haplotype or path level collections, dependent on the use case.  
+If the data is not in pansn format, each path will represent its own genome and haplotypes. Take care that you have the same delimiter twice. 
+
+```rust
+use gfa_reader::{Gfa, Pansn, Path};
+let mut graph: Gfa<()> = Gfa::new();
+graph.parse_gfa_file("data/size5.gfa", false);
+let pansn: Pansn<Path> = Pansn::from_graph(&graph.paths, " ");
 
 ```
 
