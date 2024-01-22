@@ -705,7 +705,6 @@ impl<T: OptFields> Gfa<T> {
         }
 
         // Check if the graph is numeric
-
         let is_digit = self
             .segments
             .iter()
@@ -742,11 +741,11 @@ impl<T: OptFields> Gfa<T> {
     ///
     /// # Example
     ///
-    /// ```rust, ignore
+    /// ```rust
     /// use gfa_reader::Gfa;
-    /// let mut graph = Gfa::new();
-    /// graph.parse_gfa_file("/path/to/graph");
-    /// ´´´
+    /// let mut graph: Gfa<()> = Gfa::new();
+    /// graph.parse_gfa_file("data/size5.gfa", false);
+    /// ```
     pub fn parse_gfa_file(&mut self, file_name: &str, edges: bool) {
         if file_path::new(file_name).exists() {
             let file = File::open(file_name).expect("ERROR: CAN NOT READ FILE\n");
@@ -1094,7 +1093,7 @@ pub struct NCGfa<T: OptFields> {
     pub nodes: Vec<NCNode<T>>,
     pub paths: Vec<NCPath>,
     pub edges: Option<Vec<NCEdge<T>>>,
-    pub mapper: Vec<String>,
+    pub mapper: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone)]
@@ -1131,13 +1130,6 @@ impl<T: OptFields> NCNode<T> {
 
 #[derive(Debug, PartialEq, Clone, Default)]
 /// Graph edges
-/// - From
-/// - From direction
-/// - To
-/// - To direction
-/// - Overlap (Link + containment)
-/// - Pos
-/// - Ops
 ///
 /// Comment:
 /// Edges go forward (true) or backward (false) to/from a node.
@@ -1196,7 +1188,7 @@ pub struct NCPath {
 }
 
 impl NCPath {
-    pub fn to_string(&self, mapper: &Option<Vec<&String>>) -> String {
+    pub fn to_string(&self, mapper: &Option<Vec<String>>) -> String {
         let a = format!("P\t{}\t", self.name);
         let vec: Vec<String>;
         if Some(mapper).is_some() {
@@ -1235,27 +1227,6 @@ impl NCPath {
         format!("{}\t{}\n", a, f2)
     }
 
-    fn to_string2(&self) -> String {
-        let a = format!("P\t{}\t", self.name);
-        let f1: Vec<String> = self
-            .nodes
-            .iter()
-            .zip(&self.dir)
-            .map(|n| {
-                format!("{}{}", n.0, {
-                    if *n.1 {
-                        "+".to_string()
-                    } else {
-                        "-".to_string()
-                    }
-                })
-            })
-            .collect();
-        let f2 = f1.join(",");
-        let f: Vec<String> = self.overlap.iter().map(|a| a.to_string()).collect();
-        let g = f.join(",");
-        format!("{}\t{}\t{}\n", a, f2, g)
-    }
 }
 
 impl<T: OptFields> Default for NCGfa<T> {
@@ -1284,7 +1255,7 @@ impl<T: OptFields> NCGfa<T> {
             nodes: Vec::new(),
             paths: Vec::new(),
             edges: Option::None,
-            mapper: Vec::new(),
+            mapper: Option::None,
         }
     }
 
@@ -1498,12 +1469,21 @@ impl<T: OptFields> NCGfa<T> {
             .collect();
         let mut test: Vec<(&usize, String)> = mapper.iter().map(|a| (a.1, a.0.clone())).collect();
         test.sort_by_key(|a| a.0);
-        self.mapper = test.iter().map(|a| a.1.clone()).collect();
+        self.mapper = Some(test.iter().map(|a| a.1.clone()).collect());
     }
 
     /// Get original (string) node
     pub fn get_old_node(&self, node_id: &usize) -> &String {
-        &self.mapper[node_id - 1]
+        match &self.mapper {
+            Some(map) => {
+                // You have access to the HashMap here
+                &map[node_id - 1]
+            }
+            None => {
+                // do noting here
+                panic!("No mapper found")
+            }
+        }
     }
 
     /// Write the graph to a file
@@ -1524,24 +1504,30 @@ impl<T: OptFields> NCGfa<T> {
             _ => {}
         }
         for path in self.paths.iter() {
-            write!(f, "{}", path.to_string2()).expect("Not able to write");
+            write!(f, "{}", path.to_string(&self.mapper)).expect("Not able to write");
         }
     }
 
     /// Check if the graph is really numeric
     pub fn check_numeric(&self) -> bool {
-        for (i, x) in self.mapper.iter().enumerate() {
-            if (i + 1).to_string() != *x {
-                return false;
+        match &self.mapper {
+            Some(map) => {
+                // You have access to the HashMap here
+
+                return map.iter().enumerate().all(|(i, x)| (i + 1).to_string() == *x);
+
+            }
+            None => {
+                // Handle the None case here
+                panic!("Option is None");
             }
         }
-        true
     }
 
     /// Remove the mapper if not needed
     pub fn remove_mapper(&mut self) {
         if self.check_numeric() {
-            self.mapper = Vec::new();
+            self.mapper = None;
         }
     }
 }
@@ -1579,12 +1565,23 @@ pub fn create_sort_numeric(nodes: &Vec<&str>) -> Vec<usize> {
     numeric_nodes
 }
 
+
 /// Check if the vector is compact
 pub fn vec_is_compact(numeric_nodes: &Vec<usize>) -> bool {
     numeric_nodes.windows(2).all(|pair| pair[1] == &pair[0] + 1)
 }
 
-fn get_version(file_path: &str) -> f32 {
+/// Get a version of a GFA file
+///
+/// Only read the first line  if a file
+/// Performance not checked (unpack gzip twice)
+///
+/// ```
+/// use gfa_reader::get_version;
+/// let version = get_version("data/size5.gfa");
+/// assert_eq!(1.0, version)
+/// ```
+pub fn get_version(file_path: &str) -> f32 {
     let file = File::open(file_path).expect("ERROR: CAN NOT READ FILE\n");
 
     // Parse plain text or gzipped file

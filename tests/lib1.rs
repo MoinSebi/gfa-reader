@@ -75,13 +75,6 @@ fn read_gfa_convert_nodes() {
     graph.parse_gfa_file_direct(filename, false);
     assert_eq!(graph.nodes[9].opt, ());
     assert_eq!(graph.nodes[1 - 1].id, 1);
-    if graph.mapper.len() != graph.nodes.len() {
-        graph.mapper = graph.nodes.iter().map(|x| x.id.to_string()).collect();
-    }
-    assert_eq!(graph.get_old_node(&1), &1.to_string());
-    assert_eq!(graph.nodes.len(), 26234);
-    assert_eq!(graph.nodes[0].id, 1);
-    assert_eq!(graph.paths[0].nodes[0], 4);
 }
 
 #[test]
@@ -96,7 +89,7 @@ fn read_gfa_convert_nodes2() {
     assert_eq!(graph.nodes.len(), 26234);
     assert_eq!(graph.nodes[0].id, 1);
     assert_eq!(graph.paths[0].nodes[0], 4);
-    assert_eq!(graph.mapper.len(), 26234);
+    assert_eq!(graph.mapper.unwrap().len(), 26234);
 }
 
 #[test]
