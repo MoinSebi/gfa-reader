@@ -1423,11 +1423,12 @@ impl<T: OptFields> NCGfa<T> {
     }
 
     /// Write the graph to a file
-    pub fn to_file(self, file_name: &str) {
+    pub fn to_file(self, file_name: &str, with_header: bool) {
         let f = File::create(file_name).expect("Unable to create file");
         let mut f = BufWriter::new(f);
-
-        write!(f, "{}", self.header.to_string1()).expect("Not able to write");
+        if with_header{
+            write!(f, "{}", self.header.to_string1()).expect("Not able to write");
+        }
         for node in self.nodes.iter() {
             write!(f, "{}", node.to_string1()).expect("Not able to write");
         }
