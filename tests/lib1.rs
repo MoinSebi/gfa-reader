@@ -66,6 +66,7 @@ fn read_gfa_nodes2() {
     assert_eq!(gra.genomes.len(), 5);
 }
 
+
 #[test]
 fn read_gfa_convert_nodes() {
     eprintln!("Read gfa");
@@ -90,7 +91,34 @@ fn read_gfa_convert_nodes2() {
     assert_eq!(graph.nodes[0].id, 1);
     assert_eq!(graph.paths[0].nodes[0], 4);
     assert_eq!(graph.mapper.unwrap().len(), 26234);
+
+
 }
+
+#[test]
+fn read_gfa_write() {
+    eprintln!("Read gfa");
+    // Example data
+    let filename = "data/size5.gfa";
+    let mut graph: NCGfa<()> = NCGfa::new();
+    graph.parse_gfa_file_and_convert(filename, true);
+
+    graph.to_file("dsadad", true);
+
+}
+
+#[test]
+fn read_gfa_write2() {
+    eprintln!("Read gfa");
+    // Example data
+    let filename = "data/size5.gfa";
+    let mut graph: NCGfa<()> = NCGfa::new();
+    graph.parse_gfa_file_and_convert(filename, true);
+
+    graph.to_file("dsadad2", false);
+
+}
+
 
 #[test]
 fn read_ncgfa_nodes() {

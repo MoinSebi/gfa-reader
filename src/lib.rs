@@ -126,7 +126,7 @@ pub struct Segment<T: OptFields> {
 impl<T: OptFields> Segment<T> {
     /// Write node to string
     fn to_string1(&self) -> String {
-        let a = format!("S\t{}\t{}\n", self.name, self.sequence.len());
+        let a = format!("S\t{}\t{}\n", self.name, self.sequence);
 
         if !self.opt.fields().is_empty() {
             let b: Vec<String> = self.opt.fields().iter().map(|a| a.to_string1()).collect();
@@ -1054,6 +1054,7 @@ pub struct NCGfa<T: OptFields> {
     pub nodes: Vec<NCNode<T>>,
     pub paths: Vec<NCPath>,
     pub edges: Option<Vec<NCEdge<T>>>,
+    pub walk: Vec<NCWalk>,
     pub mapper: Option<Vec<String>>,
 }
 
@@ -1071,7 +1072,7 @@ pub struct NCNode<T: OptFields> {
 impl<T: OptFields> NCNode<T> {
     /// Write node to string
     fn to_string1(&self) -> String {
-        let a = format!("S\t{}\t{}\n", self.id, self.seq.len());
+        let a = format!("S\t{}\t{}\n", self.id, self.seq);
 
         if !self.opt.fields().is_empty() {
             let b: Vec<String> = self.opt.fields().iter().map(|a| a.to_string1()).collect();
@@ -1185,6 +1186,56 @@ impl NCPath {
     }
 }
 
+
+#[derive(Debug, Clone)]
+pub struct NCWalk {
+    pub sample_id: String,
+    pub hap_index: usize,
+    pub seq_id: String,
+    pub seq_start: usize,
+    pub seq_end: usize,
+    pub walk_segments: Vec<u32>,
+    pub walk_dir: Vec<bool>,
+}
+
+
+impl NCWalk {
+    #[allow(dead_code)]
+    /// Write path to string (GFA1 format)
+    /// v1.1
+    fn to_string1(&self) -> String {
+        let a = format!(
+            "W\t{}\t{}\t{}\t{}\t{}",
+            self.sample_id, self.hap_index, self.seq_id, self.seq_start, self.seq_end
+        );
+        let f1: Vec<String> = self
+            .walk_segments
+            .iter()
+            .zip(&self.walk_dir)
+            .map(|n| {
+                format!("{}{}", n.0, {
+                    if *n.1 {
+                        ">".to_string()
+                    } else {
+                        "<".to_string()
+                    }
+                })
+            })
+            .collect();
+        let f2 = f1.join(",");
+        let a = format!("{}\t{}\n", a, f2);
+        a
+    }
+
+    fn to_path(&self, sep: &str) -> NCPath{
+        let name = self.sample_id.clone() + sep +  self.hap_index.to_string().as_str() + sep + self.seq_id.as_str() + "_" +
+            self.seq_start.to_string().as_str() + "_" + self.seq_end.to_string().as_str();
+        NCPath{name: name, dir: self.walk_dir.clone(), nodes: self.walk_segments.clone(), overlap: vec!["*".to_string()]}
+    }
+
+}
+
+
 impl<T: OptFields> Default for NCGfa<T> {
     fn default() -> Self {
         Self::new()
@@ -1212,6 +1263,7 @@ impl<T: OptFields> NCGfa<T> {
             paths: Vec::new(),
             edges: Option::None,
             mapper: Option::None,
+            walk: Vec::new(),
         }
     }
 
@@ -1310,8 +1362,34 @@ impl<T: OptFields> NCGfa<T> {
                             });
                         }
                     }
+                    "W" => {
+                        let mut a = l.split('\t');
+                        a.next();
+                        let sample_id = a.next().unwrap().to_string();
+                        let hap_index = a.next().unwrap().parse().unwrap();
+                        let seq_id = a.next().unwrap().to_string();
+                        let seq_start = a.next().unwrap().parse().unwrap();
+                        let seq_end = a.next().unwrap().parse().unwrap();
+                        let walk = a.next().unwrap().to_string();
+                        let dirs: Vec<bool> =
+                            walk.split(',').map(|d| &d[d.len() - 1..] == ">").collect();
+                        let node_id: Vec<u32> = walk
+                            .split(',')
+                            .map(|d| d[..d.len() - 1].parse().unwrap())
+                            .collect();
+                        self.walk.push(NCWalk {
+                            sample_id,
+                            hap_index,
+                            seq_id,
+                            seq_start,
+                            seq_end,
+                            walk_segments: node_id,
+                            walk_dir: dirs,
+                        });
+                    }
                     "H" => {
                         let header = Header::from_string(&l);
+                        println!("header {:?}", header);
                         self.header = header;
                     }
                     _ => {}
@@ -1427,6 +1505,7 @@ impl<T: OptFields> NCGfa<T> {
         let f = File::create(file_name).expect("Unable to create file");
         let mut f = BufWriter::new(f);
         if with_header{
+            println!("{}", self.header.version_number);
             write!(f, "{}", self.header.to_string1()).expect("Not able to write");
         }
         for node in self.nodes.iter() {
@@ -1466,6 +1545,14 @@ impl<T: OptFields> NCGfa<T> {
         if self.check_numeric() {
             self.mapper = None;
         }
+    }
+
+    pub fn convert_walks(&mut self, sep: &str) {
+        let mut paths: Vec<NCPath> = Vec::new();
+        for path in self.walk.iter() {
+            paths.push(path.to_path(sep));
+        }
+        self.paths.extend(paths);
     }
 }
 

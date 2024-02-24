@@ -26,8 +26,7 @@ not needed for the basic graph structure. Therefore, they can manually read, if 
 This option will be set once for all entries, which either parse or don't parse the optional information.
 
 #### Edges
-In several specific cases, edges are not needed since the graph structure 
-can be represented with the path information. The collection of edges are represented as `Option<edge>`, giving the possibiliy to not populate the structure at all of not needed. 
+In several specific cases, edges are not needed since the graph structure can be represented with the path information. The collection of edges are represented as `Option<edge>`, giving the possibiliy to not populate the structure at all of not needed. 
 
 ```rust
 use gfa_reader::{NCGfa, OptElem};
@@ -56,6 +55,14 @@ graph.parse_gfa_file("data/size5.gfa", false);
 let pansn: Pansn<Path> = Pansn::from_graph(&graph.paths, " ");
 
 ```
+
+## Walks
+Walks are "alternative representation" of paths in the graph. We can convert walks to path using PanSN-spec. The start and and end of the walk are concatenated at the end of the path name. We add a non-existing Overlap "*" as the for the path, since this information is not given in the walk specification. 
+
+
+```rust 
+
+```rust
 
 ### Additional information
 We recommend using NCGfa in every scenario since there are two main advantages:
