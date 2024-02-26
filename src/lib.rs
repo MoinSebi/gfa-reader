@@ -1443,6 +1443,7 @@ impl<T: OptFields> NCGfa<T> {
         self.edges = ncgraph.edges;
         self.paths = ncgraph.paths;
         self.mapper = ncgraph.mapper;
+        self.walk = ncgraph.walk;
     }
 
     /// Creat a map from string node id -> numeric node id
@@ -1507,6 +1508,23 @@ impl<T: OptFields> NCGfa<T> {
             .collect();
         let mut test: Vec<(&usize, String)> = mapper.iter().map(|a| (a.1, a.0.clone())).collect();
         test.sort_by_key(|a| a.0);
+        self.walk = graph
+            .walk
+            .iter()
+            .map(|x| NCWalk {
+                sample_id: x.sample_id.clone(),
+                hap_index: x.hap_index,
+                seq_id: x.seq_id.clone(),
+                seq_start: x.seq_start,
+                seq_end: x.seq_end,
+                walk_segments: x
+                    .walk_segments
+                    .iter()
+                    .map(|y| *mapper.get(&test[y.parse::<usize>().unwrap() - 1].1).unwrap() as u32)
+                    .collect(),
+                walk_dir: x.walk_dir.clone(),
+            })
+            .collect();
         self.mapper = Some(test.iter().map(|a| a.1.clone()).collect());
     }
 
@@ -1559,7 +1577,7 @@ impl<T: OptFields> NCGfa<T> {
             }
             None => {
                 // Handle the None case here
-                panic!("Option is None");
+                return false
             }
         }
     }
