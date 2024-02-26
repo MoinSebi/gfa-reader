@@ -854,11 +854,18 @@ impl<T: OptFields> Gfa<T> {
                         let seq_start = a.next().unwrap().parse().unwrap();
                         let seq_end = a.next().unwrap().parse().unwrap();
                         let walk = a.next().unwrap().to_string();
-                        let dirs: Vec<bool> =
-                            walk.split(',').map(|d| &d[d.len() - 1..] == ">").collect();
-                        let node_id: Vec<String> = walk
-                            .split(',')
-                            .map(|d| d[..d.len() - 1].parse().unwrap())
+                        let mut dirs: Vec<bool> = Vec::new();
+
+                        for c in walk.chars() {
+                            match c {
+                                '>' => dirs.push(true),
+                                '<' => dirs.push(false),
+                                _ => (), // Ignore all other characters
+                            }
+                        }
+                        let node_id = walk[1..]
+                            .split(['<', '>'].as_ref())
+                            .map(| n| n.parse().unwrap())// Split the string on '<' and '>'
                             .collect();
                         self.walk.push(Walk {
                             sample_id,
@@ -1287,14 +1294,17 @@ impl<T: OptFields> NCGfa<T> {
             } else {
                 Box::new(BufReader::new(file))
             };
-
             let mut nodes: Vec<NCNode<T>> = Vec::new();
             let mut edges: Vec<NCEdge<T>> = Vec::new();
 
+            let mut cc = 0;
+            eprintln!("Reading fil123123e");
             // Iterate over lines
             for line in reader.lines() {
+                cc += 1;
                 let l = line.unwrap();
-                let line_split: Vec<&str> = l.split('\t').collect();
+                let line_split: Vec<&str> = l.split_whitespace().collect();
+
                 match line_split[0] {
                     "S" => {
                         let mut a = l.split('\t');
@@ -1307,6 +1317,9 @@ impl<T: OptFields> NCGfa<T> {
                         });
                     }
                     "P" => {
+                        println!("Is P");
+
+
                         let name: String = String::from(line_split[1]);
                         let dirs: Vec<bool> = line_split[2]
                             .split(',')
@@ -1333,6 +1346,7 @@ impl<T: OptFields> NCGfa<T> {
                         });
                     }
                     "L" => {
+
                         if edge {
                             let mut a = l.split('\t');
                             a.next();
@@ -1363,6 +1377,8 @@ impl<T: OptFields> NCGfa<T> {
                         }
                     }
                     "W" => {
+                        println!("Is W");
+
                         let mut a = l.split('\t');
                         a.next();
                         let sample_id = a.next().unwrap().to_string();
@@ -1371,12 +1387,20 @@ impl<T: OptFields> NCGfa<T> {
                         let seq_start = a.next().unwrap().parse().unwrap();
                         let seq_end = a.next().unwrap().parse().unwrap();
                         let walk = a.next().unwrap().to_string();
-                        let dirs: Vec<bool> =
-                            walk.split(',').map(|d| &d[d.len() - 1..] == ">").collect();
-                        let node_id: Vec<u32> = walk
-                            .split(',')
-                            .map(|d| d[..d.len() - 1].parse().unwrap())
+                        let mut dirs: Vec<bool> = Vec::new();
+
+                        for c in walk.chars() {
+                            match c {
+                                '>' => dirs.push(true),
+                                '<' => dirs.push(false),
+                                _ => (), // Ignore all other characters
+                            }
+                        }
+                        let node_id = walk[1..]
+                            .split(['<', '>'].as_ref())
+                            .map(| n| n.parse().unwrap())// Split the string on '<' and '>'
                             .collect();
+
                         self.walk.push(NCWalk {
                             sample_id,
                             hap_index,
@@ -1389,12 +1413,12 @@ impl<T: OptFields> NCGfa<T> {
                     }
                     "H" => {
                         let header = Header::from_string(&l);
-                        println!("header {:?}", header);
                         self.header = header;
                     }
                     _ => {}
                 }
             }
+            println!("Nodes: {:?}", cc);
             nodes.sort_by_key(|a| a.id);
             self.nodes.extend(nodes);
             self.edges = Some(edges);

@@ -95,6 +95,20 @@ fn read_gfa_convert_nodes2() {
 
 }
 
+//#[test]
+/// Run on Gfa 1.1 with walks
+fn read_gfa_convert_nodes_1_1() {
+    eprintln!("Read gfa");
+    // Example data
+    let filename = "data/primates-pg.2.gfa.gz";
+    let mut graph: NCGfa<()> = NCGfa::new();
+    graph.parse_gfa_file(filename, false);
+    assert_eq!(graph.walk.len(), 4);
+    graph.convert_walks("#");
+    graph.walk = Vec::new();
+    assert_eq!(graph.paths.len(), 4);
+    assert_eq!(graph.walk.len(), 0);
+}
 #[test]
 fn read_gfa_write() {
     eprintln!("Read gfa");
