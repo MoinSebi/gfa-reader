@@ -1,9 +1,9 @@
 # gfa-reader - Reading GFA files
 
-Able to work with version  1.0, 1.1, 1.2 and 2.0 in a single structures.   
+Able to work with version  1.0, 1.1, 1.2 and 2.0 of the GFA format. Read as plain text or GZIP compressed files.
 **GFA format specification:**
 - v1: https://gfa-spec.github.io/GFA-spec/GFA1.html
-- v2 https://gfa-spec.github.io/GFA-spec/GFA2.html
+- v2 https://gfa-spec.github.io/GFA-spec/GFA2.html  
 
 
 ### Installation
@@ -57,7 +57,7 @@ let pansn: Pansn<Path> = Pansn::from_graph(&graph.paths, " ");
 ```
 
 ## Walks
-Walks are "alternative representation" of paths in the graph. We can convert walks to path using PanSN-spec. The start and and end of the walk are concatenated at the end of the path name. We add a non-existing Overlap "*" as the for the path, since this information is not given in the walk specification. 
+Walks can be interpreted as "alternative representation" of paths in the graph. We can convert walks to path using PanSN-spec. The start and and end of the walk are concatenated at the end of the path name. We add a non-existing Overlap "*" as the for the path, since this information is not given in the walk specification. 
 
 
 ```rust 
