@@ -1297,11 +1297,8 @@ impl<T: OptFields> NCGfa<T> {
             let mut nodes: Vec<NCNode<T>> = Vec::new();
             let mut edges: Vec<NCEdge<T>> = Vec::new();
 
-            let mut cc = 0;
-            eprintln!("Reading fil123123e");
             // Iterate over lines
             for line in reader.lines() {
-                cc += 1;
                 let l = line.unwrap();
                 let line_split: Vec<&str> = l.split_whitespace().collect();
 
@@ -1317,9 +1314,6 @@ impl<T: OptFields> NCGfa<T> {
                         });
                     }
                     "P" => {
-                        println!("Is P");
-
-
                         let name: String = String::from(line_split[1]);
                         let dirs: Vec<bool> = line_split[2]
                             .split(',')
@@ -1377,8 +1371,6 @@ impl<T: OptFields> NCGfa<T> {
                         }
                     }
                     "W" => {
-                        println!("Is W");
-
                         let mut a = l.split('\t');
                         a.next();
                         let sample_id = a.next().unwrap().to_string();
@@ -1418,7 +1410,6 @@ impl<T: OptFields> NCGfa<T> {
                     _ => {}
                 }
             }
-            println!("Nodes: {:?}", cc);
             nodes.sort_by_key(|a| a.id);
             self.nodes.extend(nodes);
             self.edges = Some(edges);
@@ -1547,7 +1538,6 @@ impl<T: OptFields> NCGfa<T> {
         let f = File::create(file_name).expect("Unable to create file");
         let mut f = BufWriter::new(f);
         if with_header{
-            println!("{}", self.header.version_number);
             write!(f, "{}", self.header.to_string1()).expect("Not able to write");
         }
         for node in self.nodes.iter() {
