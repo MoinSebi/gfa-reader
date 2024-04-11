@@ -1024,19 +1024,55 @@ impl<T: OptFields> Gfa<T> {
         let f = File::create(file_name).expect("Unable to create file");
         let mut f = BufWriter::new(f);
 
+        // Header
         write!(f, "{}", self.header.to_string1()).expect("Not able to write");
+
+        // segment
         for node in self.segments.iter() {
             write!(f, "{}", node.to_string1()).expect("Not able to write");
         }
+
+
         if let Some(value) = &self.links {
             for edge in value.iter() {
                 write!(f, "{}", edge.to_string_link()).expect("Not able to write");
             }
         }
 
+        for containment in self.containments {
+            write!(f, "{}", containment.to_string_link()).expect("Not able to write");
+        }
+
         for path in self.paths.iter() {
             write!(f, "{}", path.to_string1()).expect("Not able to write");
         }
+
+
+        for walk in self.walk.iter() {
+            write!(f, "{}", walk.to_string1()).expect("Not able to write");
+        }
+
+        for jump in self.jumps.iter() {
+            write!(f, "{}", jump.to_string1()).expect("Not able to write");
+        }
+
+        for edge in self.edges.iter() {
+            write!(f, "{}", edge.to_string2()).expect("Not able to write");
+        }
+
+        for fragment in self.fragments.iter() {
+            write!(f, "{}", fragment.to_string2()).expect("Not able to write");
+        }
+
+        for group in self.groups.iter() {
+            write!(f, "{}", group.to_string2()).expect("Not able to write");
+        }
+
+        for gap in self.gaps.iter() {
+            write!(f, "{}", gap.to_string1()).expect("Not able to write");
+        }
+
+
     }
 
     pub fn convert_to_ncgraph(&self, graph: &Gfa<T>) -> NCGfa<T> {
@@ -1301,7 +1337,6 @@ impl<T: OptFields> NCGfa<T> {
             for line in reader.lines() {
                 let l = line.unwrap();
                 let line_split: Vec<&str> = l.split_whitespace().collect();
-
                 match line_split[0] {
                     "S" => {
                         let mut a = l.split('\t');

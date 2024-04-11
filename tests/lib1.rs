@@ -160,6 +160,7 @@ fn read_ncgfa_nodes() {
     assert_eq!(graph.nodes[1 - 1].id, 1);
 }
 
+
 #[test]
 fn convert_gfa_ncgfa() {
     eprintln!("Read gfa");
