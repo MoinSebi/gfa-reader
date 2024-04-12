@@ -83,8 +83,8 @@ fn read_gfa_convert_nodes2() {
     eprintln!("Read gfa");
     // Example data
     let filename = "data/size5.gfa";
-    let mut graph: NCGfa<()> = NCGfa::new();
-    graph.parse_gfa_file_and_convert(filename, false);
+    let mut graph: NCGfa<()> = NCGfa::parse_gfa_file_and_convert(filename, false );
+
     assert_eq!(graph.nodes[9].opt, ());
     assert_eq!(graph.nodes[1 - 1].id, 1);
     assert_eq!(graph.nodes.len(), 26234);
@@ -115,8 +115,8 @@ fn read_gfa_convert_nodes_1_1_2() {
     eprintln!("Read gfa");
     // Example data
     let filename = "data/primates-pg.2.gfa.gz";
-    let mut graph: NCGfa<()> = NCGfa::new();
-    graph.parse_gfa_file_and_convert(filename, false);
+    let mut graph: NCGfa<()> = NCGfa::parse_gfa_file_and_convert(filename, false);
+
     assert_eq!(graph.walk.len(), 4);
     graph.convert_walks("#");
     graph.walk = Vec::new();
@@ -129,8 +129,8 @@ fn read_gfa_write() {
     eprintln!("Read gfa");
     // Example data
     let filename = "data/size5.gfa";
-    let mut graph: NCGfa<()> = NCGfa::new();
-    graph.parse_gfa_file_and_convert(filename, true);
+    let mut graph: NCGfa<()> = NCGfa::parse_gfa_file_and_convert(filename, true);
+
 
     graph.to_file("dsadad", true);
 
@@ -141,8 +141,7 @@ fn read_gfa_write2() {
     eprintln!("Read gfa");
     // Example data
     let filename = "data/size5.gfa";
-    let mut graph: NCGfa<()> = NCGfa::new();
-    graph.parse_gfa_file_and_convert(filename, true);
+    let mut graph: NCGfa<()> = NCGfa::parse_gfa_file_and_convert(filename, true);
 
     graph.to_file("dsadad2", false);
 
@@ -168,7 +167,7 @@ fn convert_gfa_ncgfa() {
     let filename = "data/size5.gfa";
     let mut graph: Gfa<()> = Gfa::new();
     graph.parse_gfa_file(filename, false);
-    let a = graph.convert_to_ncgraph(&graph);
+    let a = graph.convert_to_ncgraph();
     assert_eq!(graph.segments[1].sequence, a.nodes[1].seq);
     assert_eq!(graph.segments[1].opt, a.nodes[1].opt);
     assert_eq!(graph.segments[1].name, a.nodes[1].id.to_string());
@@ -182,7 +181,7 @@ fn convert_gfa_ncgfa2() {
     let filename = "data/size5.gfa";
     let mut graph: Gfa<()> = Gfa::new();
     graph.parse_gfa_file(filename, false);
-    let a = graph.convert_to_ncgraph(&graph);
+    let a = graph.convert_to_ncgraph();
     assert!(a.check_numeric());
 }
 
