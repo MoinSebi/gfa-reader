@@ -14,7 +14,7 @@ fn read_gfa_header() {
     assert!(gfa.is_compact());
     let mut graph: Gfa<u32, SeqIndex, SeqIndex> = Gfa::parse_gfa_file("data/size5.gfa");
 
-    let mut graph: Gfa<u32, SeqIndex, ()> = Gfa::parse_gfa_file("data/size5.gfa");
+    let mut graph: Gfa<u32, (), ()> = Gfa::parse_gfa_file("data/size5.gfa");
 
 
 // No edges and no optional fields

@@ -36,32 +36,13 @@ Overlaps are optional: () or SeqIndex.
 
 
 
-```doctest
-use gfa_reader::{NCGfa, OptElem, SeqIndex};
-
-// No edges and no optional fields
-let mut graph: Gfa<u32, SeqIndex, SeqIndex> = Gfa::parse_gfa_file("data/size5.gfa");
-
-let mut graph: Gfa<u32, SeqIndex, ()> = Gfa::parse_gfa_file("data/size5.gfa");
-
-
-// No edges and no optional fields
-let mut graph: Gfa<String, (), ()> = Gfa::parse_gfa_file("data/size5.gfa");
-
-// No edges and no optional fields
-let mut graph: Gfa<SeqIndex, (), ()> = Gfa::parse_gfa_file("data/size5.gfa");
-
+```rust
+let mut graph: Gfa<u32, (), ()> = Gfa::parse_gfa_file("data/size5.gfa");
 ```
 ## PanSN
 Pan-SN spec is a specification for storing variation graphs in a GFA format. It is strongly supported by gfa-reader with a pansn struct. It allows you to utilize genome, haplotype or path level collections, dependent on the use case.  
 If the data is not in pansn format, each path will represent its own genome and haplotypes. Take care that you have the same delimiter twice. 
 
-```rust
-use gfa_reader::{Gfa, Pansn, Path};
-let mut graph: Gfa<()> = Gfa::new();
-graph.parse_gfa_file("data/size5.gfa", false);
-let pansn: Pansn<Path> = Pansn::from_graph(&graph.paths, " ");
-```
 
 ## Walks
 Walks can be interpreted as "alternative representation" of paths in the graph. We can convert walks to path using PanSN-spec. The start and and end of the walk are concatenated at the end of the path name. We add a non-existing Overlap "*" as the for the path, since this information is not given in the walk specification. 
