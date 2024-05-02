@@ -184,6 +184,7 @@ impl<T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U> {
 
     pub fn parse_gfa_file(file_name: &str) -> Gfa<T, S, U> {
         if file_path::new(file_name).exists() {
+            print!("Reading file: {}\n", file_name);
             let file = File::open(file_name).expect("ERROR: CAN NOT READ FILE\n");
             let reader = BufReader::new(file);
 
@@ -310,8 +311,8 @@ impl<T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U> {
             }
             z.segments.sort();
             z
-        } else {
-            panic!("ERROR: FILE NOT FOUND\n");
+        }   else {
+            Gfa::new()
         }
     }
     pub fn walk_to_path(&mut self) {
