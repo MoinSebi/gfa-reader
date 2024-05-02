@@ -1,14 +1,7 @@
-use flate2::read::GzDecoder;
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::{prelude::*, BufReader};
-use std::io::{BufWriter, Write};
+
 use std::path::Path as file_path;
-use std::str::Split;
-use std::thread::sleep;
-use std::time::Duration;
-use memmap2::Mmap;
-use rand::distributions::Open01;
 
 #[derive(Debug, Clone, Default, Ord, PartialEq, Eq, PartialOrd)]
 /// GFA header line
@@ -20,12 +13,6 @@ pub struct Header {
 }
 
 impl Header {
-
-    /// Write header to string
-    fn to_string1(&self) -> String {
-        format!("H\tVN:Z:\t{}\n", self.version_number)
-    }
-
     /// Parse header from string (H-line)
     fn from_string(line: &str) -> Header {
         let line = line.split_whitespace().nth(1).unwrap();
@@ -44,79 +31,78 @@ pub trait SampleType {
     fn parse1(input: &str, s: &mut String) -> Self;
 }
 
-impl SampleType for String{
-    fn parse1(input: &str, s: &mut String) -> Self{
+impl SampleType for String {
+    fn parse1(_input: &str, s: &mut String) -> Self {
         s.to_string()
     }
 }
 
-impl SampleType for u64{
-    fn parse1(input: &str, s: &mut String) -> Self{
+impl SampleType for u64 {
+    fn parse1(input: &str, _s: &mut String) -> Self {
         input.parse().unwrap()
     }
 }
-impl SampleType for u32{
-    fn parse1(input: &str, s: &mut String) -> Self{
+impl SampleType for u32 {
+    fn parse1(input: &str, _s: &mut String) -> Self {
         input.parse().unwrap()
     }
 }
 
-impl SampleType for seq_index{
-    fn parse1(input: &str, s: &mut String) -> Self{
+impl SampleType for SeqIndex {
+    fn parse1(input: &str, s: &mut String) -> Self {
         s.push_str(input);
-        Self([s.len(), s.len() - input.len()])
+        Self([s.len() - input.len(), s.len()])
     }
 }
-
 
 pub trait Opt {
     fn parse1(input: Option<&str>, s: &mut String) -> Self;
 }
 
-impl Opt for (){
-    fn parse1(input: Option<&str>, s: &mut String) -> Self{
-        ()
-    }
+impl Opt for () {
+    fn parse1(_input: Option<&str>, _s: &mut String) -> Self {}
 }
 
-impl Opt for seq_index{
-    fn parse1(input: Option<&str>, s: &mut String) -> Self{
-        if input.is_none(){
-            return seq_index([0, 0]);
+impl Opt for SeqIndex {
+    fn parse1(input: Option<&str>, s: &mut String) -> Self {
+        if input.is_none() {
+            SeqIndex([0, 0])
         } else {
             let input = input.unwrap();
             s.push_str(input);
-            seq_index([s.len(), s.len() - input.len()])
+            Self([s.len() - input.len(), s.len()])
         }
     }
 }
 
 #[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq)]
-pub struct seq_index([usize; 2]);
+pub struct SeqIndex([usize; 2]);
 
-impl seq_index{
-    fn parse1(input: &str, s: &mut String) -> Self{
-
+impl SeqIndex {
+    fn parse1(input: &str, s: &mut String) -> Self {
         s.push_str(input);
-        Self([s.len(), s.len() - input.len()])
+        Self([s.len() - input.len(), s.len()])
     }
 
-    fn get_string<'a >(&self, s: &'a String) -> &'a str{
+    pub fn get_string<'a>(&self, s: &'a String) -> &'a str {
         &s[self.0[0]..self.0[1]]
     }
 
+    pub fn get_len(&self) -> usize {
+        self.0[1] - self.0[0]
+    }
 }
 
 #[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq)]
 pub struct Segment<T: SampleType + Ord, S: Opt + Ord> {
     pub id: T,
-    pub sequence: seq_index,
+    pub sequence: SeqIndex,
     pub length: u32,
     pub opt: S,
 }
 
 #[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq)]
-pub struct Link<T: SampleType, S: Opt, U: Opt>{
+pub struct Link<T: SampleType, S: Opt, U: Opt> {
     pub from: T,
     pub from_dir: bool,
     pub to: T,
@@ -125,7 +111,7 @@ pub struct Link<T: SampleType, S: Opt, U: Opt>{
     pub opt: S,
 }
 #[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq)]
-pub struct Path<T: SampleType, S: Opt, U: Opt>{
+pub struct Path<T: SampleType, S: Opt, U: Opt> {
     pub name: String,
     pub dir: Vec<bool>,
     pub nodes: Vec<T>,
@@ -133,7 +119,7 @@ pub struct Path<T: SampleType, S: Opt, U: Opt>{
     pub opt: S,
 }
 #[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq)]
-pub struct Walk<T: SampleType, S: Opt>{
+pub struct Walk<T: SampleType, S: Opt> {
     pub sample_id: String,
     pub hap_index: u32,
     pub seq_id: String,
@@ -144,17 +130,17 @@ pub struct Walk<T: SampleType, S: Opt>{
     pub opt: S,
 }
 #[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq)]
-pub struct Containment<T: SampleType, S: Opt>{
+pub struct Containment<T: SampleType, S: Opt> {
     pub container: T,
     pub container_dir: bool,
     pub contained: T,
     pub contained_dir: bool,
     pub pos: u32,
-    pub overlap: seq_index,
+    pub overlap: SeqIndex,
     pub opt: S,
 }
 #[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq)]
-pub struct Jump<T: SampleType, S: Opt>{
+pub struct Jump<T: SampleType, S: Opt> {
     pub from: T,
     pub from_dir: bool,
     pub to: T,
@@ -164,7 +150,7 @@ pub struct Jump<T: SampleType, S: Opt>{
 }
 
 #[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq)]
-pub struct Gfa<T: SampleType + Ord, S: Opt + Ord, U: Opt>{
+pub struct Gfa<T: SampleType + Ord, S: Opt + Ord, U: Opt> {
     pub header: Header,
     pub segments: Vec<Segment<T, S>>,
     pub links: Vec<Link<T, S, U>>,
@@ -173,12 +159,16 @@ pub struct Gfa<T: SampleType + Ord, S: Opt + Ord, U: Opt>{
     pub containment: Vec<Containment<T, S>>,
     pub walk: Vec<Walk<T, S>>,
 
-
-    pub sequence: String
-
+    pub sequence: String,
 }
 
-impl <T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U>{
+impl<T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Default for Gfa<T, S, U> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U> {
     pub fn new() -> Self {
         Self {
             header: Header::default(),
@@ -192,7 +182,7 @@ impl <T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U>{
         }
     }
 
-    pub fn parse_gfa_file(file_name: &str) -> Gfa<T, S, U>{
+    pub fn parse_gfa_file(file_name: &str) -> Gfa<T, S, U> {
         if file_path::new(file_name).exists() {
             let file = File::open(file_name).expect("ERROR: CAN NOT READ FILE\n");
             let reader = BufReader::new(file);
@@ -213,7 +203,7 @@ impl <T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U>{
                             let opt = a.next();
                             z.segments.push(Segment {
                                 id: T::parse1(name, &mut z.sequence),
-                                sequence: seq_index::parse1(sequence, &mut z.sequence),
+                                sequence: SeqIndex::parse1(sequence, &mut z.sequence),
                                 length: size,
                                 opt: S::parse1(opt, &mut z.sequence),
                             });
@@ -224,10 +214,9 @@ impl <T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U>{
 
                             z.segments.push(Segment {
                                 id: T::parse1(name, &mut z.sequence),
-                                sequence: seq_index::parse1(sequence, &mut z.sequence),
+                                sequence: SeqIndex::parse1(sequence, &mut z.sequence),
                                 length: size,
                                 opt: S::parse1(opt, &mut z.sequence),
-
                             });
                         }
                     }
@@ -296,7 +285,7 @@ impl <T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U>{
                             contained: T::parse1(contained, &mut z.sequence),
                             contained_dir,
                             pos,
-                            overlap: seq_index::parse1(overlap, &mut z.sequence),
+                            overlap: SeqIndex::parse1(overlap, &mut z.sequence),
                             opt: S::parse1(opt, &mut z.sequence),
                         });
                     }
@@ -321,34 +310,38 @@ impl <T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U>{
             }
             z.segments.sort();
             z
-        }
-        else {
+        } else {
             panic!("ERROR: FILE NOT FOUND\n");
         }
-
     }
-    pub fn walk_to_path(&mut self){
-
-        for walk in self.walk.iter(){
-            self.paths.push(Path{
-                name: walk.sample_id.clone() +"#" +  &walk.hap_index.to_string() +"#"+ &walk.seq_id.clone() +":"+ &walk.seq_start.to_string() +"-"+ &walk.seq_end.to_string(),
+    pub fn walk_to_path(&mut self) {
+        for walk in self.walk.iter() {
+            self.paths.push(Path {
+                name: walk.sample_id.clone()
+                    + "#"
+                    + &walk.hap_index.to_string()
+                    + "#"
+                    + &walk.seq_id.clone()
+                    + ":"
+                    + &walk.seq_start.to_string()
+                    + "-"
+                    + &walk.seq_end.to_string(),
                 dir: walk.walk_dir.clone(),
-                nodes: walk.walk_id.iter().cloned().collect(),
+                nodes: walk.walk_id.to_vec(),
                 overlap: U::parse1(None, &mut self.sequence),
                 opt: walk.opt.clone(),
             });
         }
         self.walk = Vec::new();
-
-
+        let _graph: Gfa<u32, (), ()> = Gfa::parse_gfa_file("data/size5.gfa");
     }
 
-    pub fn is_compact(&self) -> bool{
-        self.segments[0].id == T::parse1("1", &mut String::new()) && self.segments[self.segments.len()-1].id == T::parse1(&self.segments.len().to_string(), &mut String::new())
+    pub fn is_compact(&self) -> bool {
+        self.segments[0].id == T::parse1("1", &mut String::new())
+            && self.segments[self.segments.len() - 1].id
+                == T::parse1(&self.segments.len().to_string(), &mut String::new())
     }
 }
-
-
 
 pub fn get_version(file_name: &str) -> f32 {
     let file = File::open(file_name).expect("ERROR: CAN NOT READ FILE\n");
@@ -356,7 +349,7 @@ pub fn get_version(file_name: &str) -> f32 {
     let mut version_number = 0.0;
     for line in reader.lines() {
         let l = line.unwrap();
-        if l.starts_with("H") {
+        if l.starts_with('H') {
             let a = l.split_whitespace().nth(1).unwrap();
             version_number = a.split(':').nth(2).unwrap().parse().unwrap();
             break;
@@ -365,24 +358,26 @@ pub fn get_version(file_name: &str) -> f32 {
     version_number
 }
 
-
-fn path_parser<T: SampleType>(path: &str, s: &mut String) ->(Vec<bool>, Vec<T>){
-    let a = path.split(",");
-    let (mut dirs, mut node_id) = (Vec::with_capacity(a.clone().count()), Vec::with_capacity(a.clone().count()));
-    for d in a{
+fn path_parser<T: SampleType>(path: &str, s: &mut String) -> (Vec<bool>, Vec<T>) {
+    let a = path.split(',');
+    let (mut dirs, mut node_id) = (
+        Vec::with_capacity(a.clone().count()),
+        Vec::with_capacity(a.clone().count()),
+    );
+    for d in a {
         dirs.push(&d[d.len() - 1..] == "+");
         node_id.push(SampleType::parse1(&d[..d.len() - 1], s));
     }
     (dirs, node_id)
 }
 
-fn walk_parser<T: SampleType>(walk: &str, s1: &mut String) ->(Vec<bool>, Vec<T>) {
+fn walk_parser<T: SampleType>(walk: &str, s1: &mut String) -> (Vec<bool>, Vec<T>) {
     let a = walk[1..].split(['<', '>']).count();
     let (mut dirs, mut node_id) = (Vec::with_capacity(a), Vec::with_capacity(a));
-    dirs.push(walk.chars().next().unwrap() == '>');
+    dirs.push(walk.starts_with('>'));
     let mut s = String::new();
-    for x in walk[1..].chars(){
-        if x == '<' || x == '>'{
+    for x in walk[1..].chars() {
+        if x == '<' || x == '>' {
             dirs.push(x == '>');
             node_id.push(T::parse1(&s, s1));
             s = String::new();
@@ -393,17 +388,176 @@ fn walk_parser<T: SampleType>(walk: &str, s1: &mut String) ->(Vec<bool>, Vec<T>)
     (dirs, node_id)
 }
 
-fn parse_dumb(s: &str) -> i64{
-    if s == "*"{
-        return -1;
+fn parse_dumb(s: &str) -> i64 {
+    if s == "*" {
+        -1
     } else {
-        return s.parse().unwrap();
+        s.parse().unwrap()
     }
 }
 
 
+#[derive(Debug, Clone)]
+/// PanSN-spec path data structure
+/// PanSN-spec
+/// [sample_name][delim][haplotype_id][delim][contig_or_scaffold_name]
+pub struct Pansn<'a, T: SampleType, S: Opt, U: Opt> {
+    pub genomes: Vec<Sample<'a, T, S, U>>,
+}
 
+#[derive(Debug, Clone)]
+pub struct Sample<'a, T: SampleType, S: Opt, U: Opt>  {
+    pub name: String,
+    pub haplotypes: Vec<Haplotype<'a, T, S, U>>,
+}
 
+#[derive(Debug, Clone)]
+/// PanSN-spec haplotype
+///
+/// Merging multiple paths together
+pub struct Haplotype<'a, T: SampleType, S: Opt, U: Opt> {
+    pub name: String,
+    pub paths: Vec<&'a Path<T, S, U>>,
+}
+impl<'a, T: SampleType, S: Opt, U: Opt> Pansn<'a, T, S, U> {
+    pub fn new() -> Self {
+        Self {
+            genomes: Vec::new(),
+        }
+    }
 
+    /// Create Pansn from a list of paths
+    /// ```
+    /// ```
+    pub fn from_graph(paths: &'a Vec<Path<T, S, U>>, del: &str) -> Self {
+        let mut genomes: Vec<Sample<'a, T, S, U>> = Vec::new();
 
+        // All path names
+        let a: Vec<String> = paths.iter().map(|x| x.name.to_string()).collect();
 
+        // Check if all path names are in Pansn-spec
+        let b = a
+            .iter()
+            .map(|x| x.split(del).collect::<Vec<&str>>().len())
+            .collect::<Vec<usize>>()
+            .iter()
+            .all(|&x| x == 3);
+
+        // If no del -> one path is one haplotype, is one genome
+        if del == " " || !b {
+            for path in paths.iter() {
+                genomes.push(Sample {
+                    name: path.name.to_string(),
+                    haplotypes: vec![Haplotype {
+                        name: path.name.to_string(),
+                        paths: vec![path],
+                    }],
+                })
+            }
+        } else {
+            for path in paths.iter() {
+                let name_split: Vec<&str> = path.name.split(del).collect();
+                let genome;
+                let haplotype;
+                if name_split.len() > 1 {
+                    genome = name_split[0].to_string();
+                    haplotype = name_split[1].to_string();
+                } else {
+                    genomes.push(Sample {
+                        name: path.name.to_string(),
+                        haplotypes: vec![Haplotype {
+                            name: path.name.to_string(),
+                            paths: vec![path],
+                        }],
+                    });
+                    panic!("No Pansn, remove sep or adjust gfa")
+                }
+                // Gibt es schon so ein Genome?
+                if let Some((index1, _)) = genomes
+                    .iter()
+                    .enumerate()
+                    .find(|(_, item)| item.name == genome)
+                {
+                    let genome = &mut genomes[index1];
+                    // Gibt es schon ein Haplotype
+                    if let Some((index2, _)) = genome
+                        .haplotypes
+                        .iter()
+                        .enumerate()
+                        .find(|(_, item)| item.name == haplotype)
+                    {
+                        let haplo = &mut genome.haplotypes[index2];
+                        haplo.paths.push(path);
+                    } else {
+                        let haplo = Haplotype {
+                            name: haplotype,
+                            paths: vec![path],
+                        };
+                        genome.haplotypes.push(haplo);
+                    }
+                } else {
+                    let haplo = Haplotype {
+                        name: haplotype,
+                        paths: vec![path],
+                    };
+                    let genome = Sample {
+                        name: genome,
+                        haplotypes: vec![haplo],
+                    };
+                    genomes.push(genome);
+                }
+            }
+        }
+        Pansn { genomes }
+    }
+
+    /// Get path for each haplotype
+    pub fn get_haplo_path(&self) -> Vec<(String, Vec<&Path<T, S, U>>)> {
+        let mut result = Vec::new();
+        for x in self.genomes.iter() {
+            for y in x.haplotypes.iter() {
+                let kk: Vec<_> = y.paths.to_vec();
+                result.push((x.name.clone() + "#" + &y.name, kk));
+            }
+        }
+
+        result
+    }
+
+    /// Get path for each genome
+    pub fn get_path_genome(&self) -> Vec<(String, Vec<&Path<T, S, U>>)> {
+        let mut result = Vec::new();
+        for x in self.genomes.iter() {
+            let mut aa = Vec::new();
+            for y in x.haplotypes.iter() {
+                let kk: Vec<_> = y.paths.to_vec();
+                aa.extend(kk);
+            }
+            result.push((x.name.clone(), aa));
+        }
+
+        result
+    }
+
+    /// Get all path
+    pub fn get_paths_direct(&self) -> Vec<(String, Vec<&Path<T, S, U>>)> {
+        let mut result = Vec::new();
+        for x in self.genomes.iter() {
+            for y in x.haplotypes.iter() {
+                y.paths
+                    .iter()
+                    .for_each(|i| result.push((i.name.to_string(), vec![*i])))
+            }
+        }
+        result
+    }
+
+    pub fn number_of_pansn(&self) {
+        println!("Number of genomes: {}", self.get_path_genome().len());
+        println!(
+            "Number of individual haplotypes: {}",
+            self.get_haplo_path().len()
+        );
+        println!("Total number of paths: {}", self.get_paths_direct().len());
+    }
+}
