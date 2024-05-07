@@ -321,7 +321,7 @@ impl<T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U> {
                     _ => {}
                 }
             }
-            z.segments.sort();
+            z.segments.sort_by(|a, b| a.id.cmp(&b.id));
             z
         }   else {
             Gfa::new()
