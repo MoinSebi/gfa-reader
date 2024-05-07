@@ -29,23 +29,34 @@ impl Header {
 
 pub trait SampleType {
     fn parse1(input: &str, s: &mut String) -> Self;
+
 }
 
 impl SampleType for String {
     fn parse1(_input: &str, s: &mut String) -> Self {
         s.to_string()
     }
+
+}
+
+impl SampleType for usize {
+    fn parse1(input: &str, _s: &mut String) -> Self {
+        input.parse().unwrap()
+    }
+
 }
 
 impl SampleType for u64 {
     fn parse1(input: &str, _s: &mut String) -> Self {
         input.parse().unwrap()
     }
+
 }
 impl SampleType for u32 {
     fn parse1(input: &str, _s: &mut String) -> Self {
         input.parse().unwrap()
     }
+
 }
 
 impl SampleType for SeqIndex {
@@ -53,6 +64,7 @@ impl SampleType for SeqIndex {
         s.push_str(input);
         Self([s.len() - input.len(), s.len()])
     }
+
 }
 
 pub trait Opt {
@@ -337,10 +349,20 @@ impl<T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U> {
         let _graph: Gfa<u32, (), ()> = Gfa::parse_gfa_file("data/size5.gfa");
     }
 
+    /// Not 100%, but still okay
+    ///
+    /// Does not work with String and SeqIndex
     pub fn is_compact(&self) -> bool {
         self.segments[0].id == T::parse1("1", &mut String::new())
             && self.segments[self.segments.len() - 1].id
                 == T::parse1(&self.segments.len().to_string(), &mut String::new())
+    }
+
+    /// Get node by id
+    ///
+    /// Using binary search
+    pub fn get_node_by_id(&self, id: T) -> &Segment<T, S> {
+        &self.segments[self.segments.binary_search_by(|x| x.id.cmp(&id)).unwrap()]
     }
 }
 
@@ -561,4 +583,5 @@ impl<'a, T: SampleType, S: Opt, U: Opt> Pansn<'a, T, S, U> {
         );
         println!("Total number of paths: {}", self.get_paths_direct().len());
     }
+
 }

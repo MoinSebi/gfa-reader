@@ -27,3 +27,15 @@ fn read_gfa_header() {
     assert!(a.genomes.len() > 0);
 }
 
+#[test]
+/// Read GFA
+/// -  nodes
+/// - pansn
+fn read_gfa_header2() {
+    let mut gfa: Gfa<u64, (), ()> = Gfa::parse_gfa_file("data/primates-pg.shuffle.gfa");
+    gfa.walk_to_path();
+    let o = gfa.get_node_by_id(1).id;
+    assert_eq!(o, 1);
+}
+
+
