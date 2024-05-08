@@ -27,7 +27,12 @@ impl Header {
     }
 }
 
+/// Possible generics which can be used as identifier
 pub trait SampleType {
+
+    /// Parse a string to a generic type
+    ///
+    /// Might use a String to add the relevant data
     fn parse1(input: &str, s: &mut String) -> Self;
 
 }
@@ -67,6 +72,10 @@ impl SampleType for SeqIndex {
 
 }
 
+
+/// Optional fields
+///
+/// In addition, used for Overlap fields in the graph
 pub trait Opt {
     fn parse1(input: Option<&str>, s: &mut String) -> Self;
 }
@@ -87,6 +96,10 @@ impl Opt for SeqIndex {
     }
 }
 
+///  Start position and end position of a sequence
+///
+/// Similar to a slice
+/// Can be sued to get sequence and len
 #[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq)]
 pub struct SeqIndex([usize; 2]);
 
@@ -105,6 +118,9 @@ impl SeqIndex {
     }
 }
 
+
+
+/// GFA segment
 #[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq)]
 pub struct Segment<T: SampleType + Ord, S: Opt + Ord> {
     pub id: T,
@@ -113,6 +129,7 @@ pub struct Segment<T: SampleType + Ord, S: Opt + Ord> {
     pub opt: S,
 }
 
+/// GFA link
 #[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq)]
 pub struct Link<T: SampleType, S: Opt, U: Opt> {
     pub from: T,
@@ -122,6 +139,8 @@ pub struct Link<T: SampleType, S: Opt, U: Opt> {
     pub overlap: U,
     pub opt: S,
 }
+
+/// GFA Path
 #[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq)]
 pub struct Path<T: SampleType, S: Opt, U: Opt> {
     pub name: String,
@@ -130,6 +149,8 @@ pub struct Path<T: SampleType, S: Opt, U: Opt> {
     pub overlap: U,
     pub opt: S,
 }
+
+/// GFA Walk
 #[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq)]
 pub struct Walk<T: SampleType, S: Opt> {
     pub sample_id: String,
@@ -141,6 +162,8 @@ pub struct Walk<T: SampleType, S: Opt> {
     pub walk_id: Vec<T>,
     pub opt: S,
 }
+
+/// GFA Containment
 #[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq)]
 pub struct Containment<T: SampleType, S: Opt> {
     pub container: T,
@@ -151,6 +174,8 @@ pub struct Containment<T: SampleType, S: Opt> {
     pub overlap: SeqIndex,
     pub opt: S,
 }
+
+/// GFA Jump
 #[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq)]
 pub struct Jump<T: SampleType, S: Opt> {
     pub from: T,
@@ -161,6 +186,8 @@ pub struct Jump<T: SampleType, S: Opt> {
     pub opt: S,
 }
 
+
+/// Gfa struct
 #[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq)]
 pub struct Gfa<T: SampleType + Ord, S: Opt + Ord, U: Opt> {
     pub header: Header,
@@ -194,6 +221,8 @@ impl<T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U> {
         }
     }
 
+
+    /// Parse a GFA file
     pub fn parse_gfa_file(file_name: &str) -> Gfa<T, S, U> {
         if file_path::new(file_name).exists() {
             print!("Reading file: {}\n", file_name);
@@ -327,6 +356,9 @@ impl<T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U> {
             Gfa::new()
         }
     }
+
+
+    /// Convert Walk to Path
     pub fn walk_to_path(&mut self) {
         for walk in self.walk.iter() {
             self.paths.push(Path {
@@ -366,6 +398,8 @@ impl<T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U> {
     }
 }
 
+
+/// Get the version of a GFA file
 pub fn get_version(file_name: &str) -> f32 {
     let file = File::open(file_name).expect("ERROR: CAN NOT READ FILE\n");
     let reader = BufReader::new(file);
@@ -381,6 +415,12 @@ pub fn get_version(file_name: &str) -> f32 {
     version_number
 }
 
+
+
+
+/// Parse a path
+///
+/// Separate node and direction with a comma
 fn path_parser<T: SampleType>(path: &str, s: &mut String) -> (Vec<bool>, Vec<T>) {
     let a = path.split(',');
     let (mut dirs, mut node_id) = (
@@ -394,6 +434,7 @@ fn path_parser<T: SampleType>(path: &str, s: &mut String) -> (Vec<bool>, Vec<T>)
     (dirs, node_id)
 }
 
+/// Parse a walk
 fn walk_parser<T: SampleType>(walk: &str, s1: &mut String) -> (Vec<bool>, Vec<T>) {
     let a = walk[1..].split(['<', '>']).count();
     let (mut dirs, mut node_id) = (Vec::with_capacity(a), Vec::with_capacity(a));
@@ -411,6 +452,9 @@ fn walk_parser<T: SampleType>(walk: &str, s1: &mut String) -> (Vec<bool>, Vec<T>
     (dirs, node_id)
 }
 
+/// Parse a string to a generic type
+///
+/// Only needed for Jumps
 fn parse_dumb(s: &str) -> i64 {
     if s == "*" {
         -1
