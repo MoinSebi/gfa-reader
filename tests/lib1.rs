@@ -1,4 +1,4 @@
-use gfa_reader::{Gfa, Pansn, SeqIndex};
+use gfa_reader::{check_numeric_gfafile, Gfa, Pansn, SeqIndex};
 
 #[test]
 /// Read GFA
@@ -34,5 +34,19 @@ fn read_gfa_header2() {
     let o = gfa.get_node_by_id(1).id;
     assert_eq!(o, 1);
 }
+
+
+#[test]
+/// Read GFA
+/// -  nodes
+/// - pansn
+fn check_numeric() {
+    let mut gfa= check_numeric_gfafile("data/testGraph_complex.gfa");
+    assert_eq!(gfa, false);
+    let mut gfa= check_numeric_gfafile("data/primates-pg.shuffle.gfa");
+    assert_eq!(gfa, true);
+}
+
+
 
 

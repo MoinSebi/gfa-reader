@@ -416,6 +416,23 @@ pub fn get_version(file_name: &str) -> f32 {
 }
 
 
+/// Check if a gfa file only contains of numeric segments
+pub fn check_numeric_gfafile(file_name: &str) -> bool {
+    let file = File::open(file_name).expect("ERROR: CAN NOT READ FILE\n");
+    let reader = BufReader::new(file);
+
+    for line in reader.lines() {
+        let l = line.unwrap();
+        if l.starts_with('S') {
+            let a = l.split_whitespace().nth(1).unwrap();
+            if a.parse::<u64>().is_err() {
+                return false;
+            }
+
+        }
+    }
+    true
+}
 
 
 /// Parse a path
