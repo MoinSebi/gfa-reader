@@ -359,13 +359,13 @@ impl<T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U> {
 
 
     /// Convert Walk to Path
-    pub fn walk_to_path(&mut self) {
+    pub fn walk_to_path(&mut self, sep: &str) {
         for walk in self.walk.iter() {
             self.paths.push(Path {
                 name: walk.sample_id.clone()
-                    + "#"
+                    + sep
                     + &walk.hap_index.to_string()
-                    + "#"
+                    + sep
                     + &walk.seq_id.clone()
                     + ":"
                     + &walk.seq_start.to_string()
