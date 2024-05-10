@@ -1,6 +1,6 @@
 # gfa-reader - Reading GFA files
 
-Able to work with version  1.0, 1.1, 1.2 in plain text format. Newer version will be supported in the future. This is read only - graphs (at least the sequence) can not change using this implementation. Nevertheless, graph representation is extremely memory efficient. 
+Able to work with version  1.0, 1.1, 1.2 in plain text format. Newer version will be supported in the future. This is read only - graphs (at least the sequence) can not change using this implementation. Nevertheless, this graph representation is extremely memory efficient. 
 - v1: https://gfa-spec.github.io/GFA-spec/GFA1.html
 - v2: https://gfa-spec.github.io/GFA-spec/GFA2.html  
 
@@ -31,7 +31,7 @@ As stated above, we support the following sample types:
 - usize
 - SeqIndex
 
-**Comment**: Use "String" only if it is not possible to use the other types and the IDs must be represented as strings. Alternatively use SeqIndex which is smaller but can also returns "&str" information. 
+**Comment**: Use "String" only if it is not possible to use the other types and the IDs must be represented as strings. Alternatively use SeqIndex which is smaller but can also return "&str" information. 
 
 #### Overlaps
 Overlaps are optional, since many graphs construction pipelines do not return graphs with overlaps.  
