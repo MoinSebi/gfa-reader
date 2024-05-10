@@ -1,6 +1,6 @@
 # gfa-reader - Reading GFA files
 
-Able to work with version  1.0, 1.1, 1.2 in plain text format. Newer version will be supported in the future. 
+Able to work with version  1.0, 1.1, 1.2 in plain text format. Newer version will be supported in the future. This is read only - graphs (at least the sequence) can not change using this implementation. Nevertheless, graph representation is extremely memory efficient. 
 - v1: https://gfa-spec.github.io/GFA-spec/GFA1.html
 - v2: https://gfa-spec.github.io/GFA-spec/GFA2.html  
 
@@ -18,33 +18,34 @@ Gfa-reader has one main structure: Gfa. It contains three generics which can be 
 1. Sample ID: The type of the sample id. Can be a String, u32, u64, SeqIndex
 2. Overlap information: () or SeqIndex
 3. Optional fields: () or SeqIndex
-
+4. 
+```rust
+let graph: Gfa<u32, (), ()> = Gfa::parse_gfa_file("data/size5.gfa");
+```
 
 #### Supported sample types:
 As stated above, we support the following sample types:
 - String
 - u32
 - u64
+- usize
 - SeqIndex
 
-Comment: Use "String" only if it is not possible to use the other types and the IDs must be represented as strings. Alternatively use SeqIndex which is smaller but can also be used as a string.
+**Comment**: Use "String" only if it is not possible to use the other types and the IDs must be represented as strings. Alternatively use SeqIndex which is smaller but can also returns "&str" information. 
 
 #### Overlaps
-Overlaps are optional: () or SeqIndex. 
+Overlaps are optional, since many graphs construction pipelines do not return graphs with overlaps.  
+Possible values: () or SeqIndex. 
 #### Optional fields
-Overlaps are optional: () or SeqIndex.
+Optionals fields in GFA can contain powerfull information. There is no additional parsing of these fields, except holding the raw String.  
+Possible values: () or SeqIndex.
 
-
-
-```rust
-let mut graph: Gfa<u32, (), ()> = Gfa::parse_gfa_file("data/size5.gfa");
-```
 ## PanSN
-Pan-SN spec is a specification for storing variation graphs in a GFA format. It is strongly supported by gfa-reader with a pansn struct. It allows you to utilize genome, haplotype or path level collections, dependent on the use case.  
-If the data is not in pansn format, each path will represent its own genome and haplotypes. Take care that you have the same delimiter twice. 
+Pan-SN spec is a specification for storing paths in GFA format. It is strongly supported by ```gfa-reader``` with a ```Pansn``` struct. It allows you to utilize genome, haplotype or path level collections, dependent on the use case.  
+If the data is not in PanSn-spec, each path will represent by its own. Take care that you have the same delimiter twice. 
 
 
 ## Walks
-Walks can be interpreted as "alternative representation" of paths in the graph. We can convert walks to path using PanSN-spec. The start and and end of the walk are concatenated at the end of the path name. We add a non-existing Overlap "*" as the for the path, since this information is not given in the walk specification. 
+Walks can be interpreted as "alternative representation" of paths. We can convert walks to path using PanSN-spec by creating a specific path name using the information provided by the walk. The start and end of ```walk``` are concatenated at the end of the path name. We add a non-existing Overlap "*" in each newly created path, since this information is not given in the walk specification. 
 
 
