@@ -19,7 +19,7 @@ Gfa-reader has one main structure: Gfa. It contains three generics which can be 
 2. Overlap information: () or SeqIndex
 3. Optional fields: () or SeqIndex
 4. 
-```rust
+```
 let graph: Gfa<u32, (), ()> = Gfa::parse_gfa_file("data/size5.gfa");
 ```
 
@@ -41,11 +41,30 @@ Optionals fields in GFA can contain powerfull information. There is no additiona
 Possible values: () or SeqIndex.
 
 ## PanSN
-Pan-SN spec is a specification for storing paths in GFA format. It is strongly supported by ```gfa-reader``` with a ```Pansn``` struct. It allows you to utilize genome, haplotype or path level collections, dependent on the use case.  
-If the data is not in PanSn-spec, each path will represent by its own. Take care that you have the same delimiter twice. 
+Pan-SN spec is a specification for storing paths in GFA format. It is strongly supported by ```gfa-reader``` with a ```Pansn``` struct. It allows you to utilize genome, haplotype or path level, dependent on the use case (see below).   
+The hierachy is the following: A genome is a collection of different haplotypes, which are a collection of multiple paths. The Pansn struct contains of a vector of genomes. If the data is not in PanSn-spec, each path will represent in its own genome (1-1-1).
 
+```text
+let wrapper: Pansn<u32, (), ()> = Pansn::from_graph(&graph.paths, "#");
+
+//Extracting collection of path on different levels: 
+let haplo_paths: Vec<(String, &Path)> = wrapper.get_haplo_path(); 
+let genome_paths: Vec<(String, &Path)> = wrapper.get_path_genome(); 
+let all_paths: Vec<(String, &Path)> = wrapper.get_paths_directly();
+```
 
 ## Walks
-Walks can be interpreted as "alternative representation" of paths. We can convert walks to path using PanSN-spec by creating a specific path name using the information provided by the walk. The start and end of ```walk``` are concatenated at the end of the path name. We add a non-existing Overlap "*" in each newly created path, since this information is not given in the walk specification. 
+Walks can be interpreted as "alternative representation" of paths. We can convert walks to path using PanSN-spec by creating a specific path name using the information provided by the walk. The start and end of ```walk``` are concatenated at the end of the path name. We add a non-existing overlap "*" in each newly created path, since this information is not given in the walk specification. 
+
+```text
+let graph: Gfa<u32, (), ()> = Gfa::parse_gfa_file("data/size5.gfa");
+graph.walk_to_path("#");
+```
+
+## Additional Gfa/Pansn functions
+- ```gfa.get_node_by_id(node_id) -> &Segement``` returns a specific node by its ID using binary search.
+
+## Additional GFA related functions 
+- ```Gfa::check_numeric_gfafile()``` checks if the GFA file contains numeric node IDs.
 
 
