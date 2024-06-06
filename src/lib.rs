@@ -29,39 +29,33 @@ impl Header {
 
 /// Possible generics which can be used as identifier
 pub trait SampleType {
-
     /// Parse a string to a generic type
     ///
     /// Might use a String to add the relevant data
     fn parse1(input: &str, s: &mut String) -> Self;
-
 }
 
 impl SampleType for String {
     fn parse1(_input: &str, s: &mut String) -> Self {
         s.to_string()
     }
-
 }
 
 impl SampleType for usize {
     fn parse1(input: &str, _s: &mut String) -> Self {
         input.parse().unwrap()
     }
-
 }
 
 impl SampleType for u64 {
     fn parse1(input: &str, _s: &mut String) -> Self {
         input.parse().unwrap()
     }
-
 }
 impl SampleType for u32 {
     fn parse1(input: &str, _s: &mut String) -> Self {
         input.parse().unwrap()
     }
-
 }
 
 impl SampleType for SeqIndex {
@@ -69,9 +63,7 @@ impl SampleType for SeqIndex {
         s.push_str(input);
         Self([s.len() - input.len(), s.len()])
     }
-
 }
-
 
 /// Optional fields
 ///
@@ -109,7 +101,7 @@ impl SeqIndex {
         Self([s.len() - input.len(), s.len()])
     }
 
-    pub fn get_string<'a>(&self, s: &'a String) -> &'a str {
+    pub fn get_string<'a>(&self, s: &'a str) -> &'a str {
         &s[self.0[0]..self.0[1]]
     }
 
@@ -117,8 +109,6 @@ impl SeqIndex {
         self.0[1] - self.0[0]
     }
 }
-
-
 
 /// GFA segment
 #[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq)]
@@ -186,7 +176,6 @@ pub struct Jump<T: SampleType, S: Opt> {
     pub opt: S,
 }
 
-
 /// Gfa struct
 #[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq)]
 pub struct Gfa<T: SampleType + Ord, S: Opt + Ord, U: Opt> {
@@ -221,11 +210,10 @@ impl<T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U> {
         }
     }
 
-
     /// Parse a GFA file
     pub fn parse_gfa_file(file_name: &str) -> Gfa<T, S, U> {
         if file_path::new(file_name).exists() {
-            print!("Reading file: {}\n", file_name);
+            println!("Reading file: {}", file_name);
             let file = File::open(file_name).expect("ERROR: CAN NOT READ FILE\n");
             let reader = BufReader::new(file);
 
@@ -352,11 +340,10 @@ impl<T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U> {
             }
             z.segments.sort_by(|a, b| a.id.cmp(&b.id));
             z
-        }   else {
+        } else {
             Gfa::new()
         }
     }
-
 
     /// Convert Walk to Path
     pub fn walk_to_path(&mut self, sep: &str) {
@@ -396,18 +383,13 @@ impl<T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U> {
     pub fn get_node_by_id(&self, id: &T) -> &Segment<T, S> {
         &self.segments[self.segments.binary_search_by(|x| x.id.cmp(id)).unwrap()]
     }
-
-
-
 }
 
 impl Gfa<u32, (), ()> {
     pub fn get_ind(&self, id: u32) -> &Segment<u32, ()> {
         &self.segments[self.segments.binary_search_by(|x| x.id.cmp(&id)).unwrap()]
     }
-
 }
-
 
 /// Get the version of a GFA file
 pub fn get_version(file_name: &str) -> f32 {
@@ -425,7 +407,6 @@ pub fn get_version(file_name: &str) -> f32 {
     version_number
 }
 
-
 /// Check if a gfa file only contains of numeric segments
 pub fn check_numeric_gfafile(file_name: &str) -> bool {
     let file = File::open(file_name).expect("ERROR: CAN NOT READ FILE\n");
@@ -438,12 +419,10 @@ pub fn check_numeric_gfafile(file_name: &str) -> bool {
             if a.parse::<u64>().is_err() {
                 return false;
             }
-
         }
     }
     true
 }
-
 
 /// Check if a gfa file only contains of numeric segments and is compact
 pub fn check_numeric_compact_gfafile(file_name: &str) -> (bool, bool) {
@@ -459,7 +438,6 @@ pub fn check_numeric_compact_gfafile(file_name: &str) -> (bool, bool) {
             } else {
                 p.push(a.parse::<u64>().unwrap());
             }
-
         }
     }
     p.sort();
@@ -469,7 +447,6 @@ pub fn check_numeric_compact_gfafile(file_name: &str) -> (bool, bool) {
         (true, false)
     }
 }
-
 
 /// Parse a path
 ///
@@ -505,7 +482,7 @@ fn walk_parser<T: SampleType>(walk: &str, s1: &mut String) -> (Vec<bool>, Vec<T>
     (dirs, node_id)
 }
 
-pub fn fill_nodes(graph: &mut Gfa<u32, (), ()>)  {
+pub fn fill_nodes(graph: &mut Gfa<u32, (), ()>) {
     graph.segments.sort();
 
     let mut filled_vec = Vec::new();
@@ -536,8 +513,6 @@ pub fn fill_nodes(graph: &mut Gfa<u32, (), ()>)  {
     graph.segments = filled_vec;
 }
 
-
-
 /// Parse a string to a generic type
 ///
 /// Only needed for Jumps
@@ -549,7 +524,6 @@ fn parse_dumb(s: &str) -> i64 {
     }
 }
 
-
 #[derive(Debug, Clone)]
 /// PanSN-spec path data structure
 /// PanSN-spec
@@ -559,7 +533,7 @@ pub struct Pansn<'a, T: SampleType, S: Opt, U: Opt> {
 }
 
 #[derive(Debug, Clone)]
-pub struct Sample<'a, T: SampleType, S: Opt, U: Opt>  {
+pub struct Sample<'a, T: SampleType, S: Opt, U: Opt> {
     pub name: String,
     pub haplotypes: Vec<Haplotype<'a, T, S, U>>,
 }
@@ -572,6 +546,12 @@ pub struct Haplotype<'a, T: SampleType, S: Opt, U: Opt> {
     pub name: String,
     pub paths: Vec<&'a Path<T, S, U>>,
 }
+impl<'a, T: SampleType, S: Opt, U: Opt> Default for Pansn<'a, T, S, U> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<'a, T: SampleType, S: Opt, U: Opt> Pansn<'a, T, S, U> {
     pub fn new() -> Self {
         Self {
@@ -582,7 +562,7 @@ impl<'a, T: SampleType, S: Opt, U: Opt> Pansn<'a, T, S, U> {
     /// Create Pansn from a list of paths
     /// ```
     /// ```
-    pub fn from_graph(paths: &'a Vec<Path<T, S, U>>, del: &str) -> Self {
+    pub fn from_graph(paths: &'a [Path<T, S, U>], del: &str) -> Self {
         let mut genomes: Vec<Sample<'a, T, S, U>> = Vec::new();
 
         // All path names
@@ -713,5 +693,4 @@ impl<'a, T: SampleType, S: Opt, U: Opt> Pansn<'a, T, S, U> {
         );
         println!("Total number of paths: {}", self.get_paths_direct().len());
     }
-
 }
