@@ -396,6 +396,16 @@ impl<T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U> {
     pub fn get_node_by_id(&self, id: T) -> &Segment<T, S> {
         &self.segments[self.segments.binary_search_by(|x| x.id.cmp(&id)).unwrap()]
     }
+
+
+
+}
+
+impl Gfa<u32, (), ()> {
+    pub fn get_ind(&self, id: u32) -> &Segment<u32, ()> {
+        &self.segments[self.segments.binary_search_by(|x| x.id.cmp(&id)).unwrap()]
+    }
+
 }
 
 
@@ -435,6 +445,32 @@ pub fn check_numeric_gfafile(file_name: &str) -> bool {
 }
 
 
+/// Check if a gfa file only contains of numeric segments and is compact
+pub fn check_numeric_compact_gfafile(file_name: &str) -> (bool, bool) {
+    let file = File::open(file_name).expect("ERROR: CAN NOT READ FILE\n");
+    let reader = BufReader::new(file);
+    let mut p = Vec::new();
+    for line in reader.lines() {
+        let l = line.unwrap();
+        if l.starts_with('S') {
+            let a = l.split_whitespace().nth(1).unwrap();
+            if a.parse::<u64>().is_err() {
+                return (false, false);
+            } else {
+                p.push(a.parse::<u64>().unwrap());
+            }
+
+        }
+    }
+    p.sort();
+    if p[0] == 1 && p[p.len() - 1] == p.len() as u64 {
+        (true, true)
+    } else {
+        (true, false)
+    }
+}
+
+
 /// Parse a path
 ///
 /// Separate node and direction with a comma
@@ -468,6 +504,39 @@ fn walk_parser<T: SampleType>(walk: &str, s1: &mut String) -> (Vec<bool>, Vec<T>
     }
     (dirs, node_id)
 }
+
+pub fn fill_nodes(graph: &mut Gfa<u32, (), ()>)  {
+    graph.segments.sort();
+
+    let mut filled_vec = Vec::new();
+    let mut prev_value = graph.segments[0].id;
+
+    // Iterate through the sorted vector and find missing values
+    for value in graph.segments.iter() {
+        // Check if there are missing values between previous value and current value
+        if value.id > prev_value + 1 {
+            // Insert missing values
+            for missing_value in prev_value + 1..value.id {
+                filled_vec.push(Segment {
+                    id: missing_value,
+                    sequence: SeqIndex([0, 0]),
+                    length: 0,
+                    opt: (),
+                });
+            }
+        }
+        filled_vec.push(Segment {
+            id: value.id,
+            sequence: value.sequence.clone(),
+            length: value.length,
+            opt: (),
+        });
+        prev_value = value.id;
+    }
+    graph.segments = filled_vec;
+}
+
+
 
 /// Parse a string to a generic type
 ///
