@@ -393,8 +393,8 @@ impl<T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U> {
     /// Get node by id
     ///
     /// Using binary search
-    pub fn get_node_by_id(&self, id: T) -> &Segment<T, S> {
-        &self.segments[self.segments.binary_search_by(|x| x.id.cmp(&id)).unwrap()]
+    pub fn get_node_by_id(&self, id: &T) -> &Segment<T, S> {
+        &self.segments[self.segments.binary_search_by(|x| x.id.cmp(id)).unwrap()]
     }
 
 
