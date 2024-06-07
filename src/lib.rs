@@ -222,15 +222,15 @@ impl<T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U> {
 
             // Iterate over lines
             for line in reader.lines() {
-                let l = line.unwrap();
-                let mut a = l.split('\t');
-                match a.next().unwrap() {
+                let line_string = line.unwrap();
+                let mut split_line = line_string.split_whitespace();
+                match split_line.next().unwrap() {
                     "S" => {
-                        let name = a.next().unwrap();
+                        let name = split_line.next().unwrap();
                         if version_number < 2.0 {
-                            let sequence = a.next().unwrap();
+                            let sequence = split_line.next().unwrap();
                             let size = sequence.len() as u32;
-                            let opt = a.next();
+                            let opt = split_line.next();
                             z.segments.push(Segment {
                                 id: T::parse1(name, &mut z.sequence),
                                 sequence: SeqIndex::parse1(sequence, &mut z.sequence),
@@ -238,9 +238,9 @@ impl<T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U> {
                                 opt: S::parse1(opt, &mut z.sequence),
                             });
                         } else {
-                            let sequence = a.next().unwrap();
-                            let size = a.next().unwrap().parse().unwrap();
-                            let opt = a.next();
+                            let sequence = split_line.next().unwrap();
+                            let size = split_line.next().unwrap().parse().unwrap();
+                            let opt = split_line.next();
 
                             z.segments.push(Segment {
                                 id: T::parse1(name, &mut z.sequence),
@@ -251,16 +251,16 @@ impl<T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U> {
                         }
                     }
                     "H" => {
-                        let header = Header::from_string(&l);
+                        let header = Header::from_string(&line_string);
                         z.header = header;
                     }
                     "L" => {
-                        let from = a.next().unwrap();
-                        let from_dir = a.next().unwrap() == "+";
-                        let to = a.next().unwrap();
-                        let to_dir = a.next().unwrap() == "+";
-                        let overlap = a.next();
-                        let opt = a.next();
+                        let from = split_line.next().unwrap();
+                        let from_dir = split_line.next().unwrap() == "+";
+                        let to = split_line.next().unwrap();
+                        let to_dir = split_line.next().unwrap() == "+";
+                        let overlap = split_line.next();
+                        let opt = split_line.next();
                         z.links.push(Link {
                             from: T::parse1(from, &mut z.sequence),
                             from_dir,
@@ -271,25 +271,25 @@ impl<T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U> {
                         });
                     }
                     "P" => {
-                        let name = a.next().unwrap().to_string();
-                        let (dirs, node_id) = path_parser(a.next().unwrap(), &mut z.sequence);
-                        let overlap = a.next();
+                        let name = split_line.next().unwrap().to_string();
+                        let (dirs, node_id) = path_parser(split_line.next().unwrap(), &mut z.sequence);
+                        let overlap = split_line.next();
                         z.paths.push(Path {
                             name,
                             dir: dirs,
                             nodes: node_id,
                             overlap: U::parse1(overlap, &mut z.sequence),
-                            opt: S::parse1(a.next(), &mut z.sequence),
+                            opt: S::parse1(split_line.next(), &mut z.sequence),
                         });
                     }
                     "W" => {
-                        let sample_id = a.next().unwrap().to_string();
-                        let hap_index = a.next().unwrap().parse().unwrap();
-                        let seq_id = a.next().unwrap().to_string();
-                        let seq_start = a.next().unwrap().parse().unwrap();
-                        let seq_end = a.next().unwrap().parse().unwrap();
-                        let (w1, w2) = walk_parser(a.next().unwrap(), &mut z.sequence);
-                        let opt = a.next();
+                        let sample_id = split_line.next().unwrap().to_string();
+                        let hap_index = split_line.next().unwrap().parse().unwrap();
+                        let seq_id = split_line.next().unwrap().to_string();
+                        let seq_start = split_line.next().unwrap().parse().unwrap();
+                        let seq_end = split_line.next().unwrap().parse().unwrap();
+                        let (w1, w2) = walk_parser(split_line.next().unwrap(), &mut z.sequence);
+                        let opt = split_line.next();
                         z.walk.push(Walk {
                             sample_id,
                             hap_index,
@@ -302,13 +302,13 @@ impl<T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U> {
                         });
                     }
                     "C" => {
-                        let container = a.next().unwrap();
-                        let container_dir = a.next().unwrap() == "+";
-                        let contained = a.next().unwrap();
-                        let contained_dir = a.next().unwrap() == "+";
-                        let pos = a.next().unwrap().parse().unwrap();
-                        let overlap = a.next().unwrap();
-                        let opt = a.next();
+                        let container = split_line.next().unwrap();
+                        let container_dir = split_line.next().unwrap() == "+";
+                        let contained = split_line.next().unwrap();
+                        let contained_dir = split_line.next().unwrap() == "+";
+                        let pos = split_line.next().unwrap().parse().unwrap();
+                        let overlap = split_line.next().unwrap();
+                        let opt = split_line.next();
                         z.containment.push(Containment {
                             container: T::parse1(container, &mut z.sequence),
                             container_dir,
@@ -320,12 +320,12 @@ impl<T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U> {
                         });
                     }
                     "J" => {
-                        let from = a.next().unwrap();
-                        let from_dir = a.next().unwrap() == "+";
-                        let to = a.next().unwrap();
-                        let to_dir = a.next().unwrap() == "+";
-                        let distance = parse_dumb(a.next().unwrap());
-                        let opt = a.next();
+                        let from = split_line.next().unwrap();
+                        let from_dir = split_line.next().unwrap() == "+";
+                        let to = split_line.next().unwrap();
+                        let to_dir = split_line.next().unwrap() == "+";
+                        let distance = parse_dumb(split_line.next().unwrap());
+                        let opt = split_line.next();
                         z.jump.push(Jump {
                             from: T::parse1(from, &mut z.sequence),
                             from_dir,
@@ -365,7 +365,6 @@ impl<T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U> {
             });
         }
         self.walk = Vec::new();
-        let _graph: Gfa<u32, (), ()> = Gfa::parse_gfa_file("data/size5.gfa");
     }
 
     /// Not 100%, but still okay
@@ -479,6 +478,8 @@ fn walk_parser<T: SampleType>(walk: &str, s1: &mut String) -> (Vec<bool>, Vec<T>
             s.push(x);
         }
     }
+    node_id.push(T::parse1(&s, s1));
+
     (dirs, node_id)
 }
 

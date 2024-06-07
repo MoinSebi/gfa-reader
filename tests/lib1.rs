@@ -30,8 +30,15 @@ fn read_gfa_string() {
 /// READ GFA 1.1
 fn read_gfa_header2() {
     let mut gfa: Gfa<u64, (), ()> = Gfa::parse_gfa_file("data/testGraph_1.1.gfa");
+    assert_eq!(gfa.walk[gfa.walk.len()-1].walk_id.len(), 1);
+
     gfa.walk_to_path("#");
     let o = gfa.get_node_by_id(&1).id;
+    //assert_eq!(gfa.paths.len(), 1);
+    assert_eq!(gfa.walk.len(), 0);
+    assert_eq!(gfa.paths.len(), 7);
+
+    assert_eq!(gfa.paths[gfa.paths.len()-1].nodes.len(), 1);
     assert_eq!(o, 1);
 }
 
