@@ -51,8 +51,11 @@ fn check_numeric() {
     assert!(gfa);
     let gfa = check_numeric_gfafile("data/testGraph_compact.gfa");
     assert!(gfa);
+    let gfa = check_numeric_gfafile("data/testGraph_compact_nopw.gfa");
+    assert!(gfa);
     let gfa = check_numeric_gfafile("data/testGraph_non-num.gfa");
     assert!(!gfa);
+
 }
 
 #[test]
@@ -65,6 +68,8 @@ fn check_numeric2() {
     let gfa = check_numeric_compact_gfafile("data/testGraph_non-num.gfa");
     assert_eq!(gfa, (false, false));
     let gfa = check_numeric_compact_gfafile("data/testGraph_compact.gfa");
+    assert_eq!(gfa, (true, true));
+    let gfa = check_numeric_compact_gfafile("data/testGraph_compact_nopw.gfa");
     assert_eq!(gfa, (true, true));
     let gfa = check_numeric_compact_gfafile("data/testGraph_1.1.gfa");
     assert_eq!(gfa, (true, true));
