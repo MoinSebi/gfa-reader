@@ -2,6 +2,7 @@ use std::fs::File;
 use std::io::{prelude::*, BufReader};
 
 use std::path::Path as file_path;
+use std::thread::sleep;
 
 #[derive(Debug, Clone, Default, Ord, PartialEq, Eq, PartialOrd)]
 /// GFA header line
@@ -33,17 +34,38 @@ pub trait SampleType {
     ///
     /// Might use a String to add the relevant data
     fn parse1(input: &str, s: &mut String) -> Self;
+
+    fn get_usize(&self) -> usize;
+
+    fn is_digit() -> bool;
 }
 
 impl SampleType for String {
     fn parse1(_input: &str, s: &mut String) -> Self {
         s.to_string()
     }
+
+    fn get_usize(&self) -> usize {
+        0
+    }
+
+    fn is_digit() -> bool {
+        false
+    }
+
+
 }
 
 impl SampleType for usize {
     fn parse1(input: &str, _s: &mut String) -> Self {
         input.parse().unwrap()
+    }
+    fn get_usize(&self) -> usize {
+        *self as usize
+    }
+
+    fn is_digit() -> bool {
+        true
     }
 }
 
@@ -51,10 +73,26 @@ impl SampleType for u64 {
     fn parse1(input: &str, _s: &mut String) -> Self {
         input.parse().unwrap()
     }
+    fn get_usize(&self) -> usize {
+        *self as usize
+    }
+
+
+    fn is_digit() -> bool {
+        true
+    }
 }
 impl SampleType for u32 {
     fn parse1(input: &str, _s: &mut String) -> Self {
         input.parse().unwrap()
+    }
+
+    fn get_usize(&self) -> usize {
+        *self as usize
+    }
+
+    fn is_digit() -> bool {
+        true
     }
 }
 
@@ -62,6 +100,14 @@ impl SampleType for SeqIndex {
     fn parse1(input: &str, s: &mut String) -> Self {
         s.push_str(input);
         Self([s.len() - input.len(), s.len()])
+    }
+
+    fn get_usize(&self) -> usize {
+        0
+    }
+
+    fn is_digit() -> bool {
+        false
     }
 }
 
@@ -92,6 +138,8 @@ impl Opt for SeqIndex {
 ///
 /// Similar to a slice
 /// Can be sued to get sequence and len
+///
+/// Memory size: 16 byte
 #[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq)]
 pub struct SeqIndex([usize; 2]);
 
@@ -111,6 +159,8 @@ impl SeqIndex {
 }
 
 /// GFA segment
+///
+/// Memory size: 16 + 4 + 0 + 0 = 20
 #[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq)]
 pub struct Segment<T: SampleType + Ord, S: Opt + Ord> {
     pub id: T,
@@ -120,17 +170,22 @@ pub struct Segment<T: SampleType + Ord, S: Opt + Ord> {
 }
 
 /// GFA link
+///
+/// Memory size (u32): 4 + 1 + 4 + 1 + 0 + 0 = 12 (padding)
+///
 #[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq)]
 pub struct Link<T: SampleType, S: Opt, U: Opt> {
     pub from: T,
-    pub from_dir: bool,
     pub to: T,
+    pub from_dir: bool,
     pub to_dir: bool,
     pub overlap: U,
     pub opt: S,
 }
 
 /// GFA Path
+///
+/// Memory size (u32): String + 4*X + 1*X + 0 + 0 ~ 5*x
 #[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq)]
 pub struct Path<T: SampleType, S: Opt, U: Opt> {
     pub name: String,
@@ -141,6 +196,8 @@ pub struct Path<T: SampleType, S: Opt, U: Opt> {
 }
 
 /// GFA Walk
+///
+/// Memory size (u32): 5*x
 #[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq)]
 pub struct Walk<T: SampleType, S: Opt> {
     pub sample_id: String,
@@ -151,6 +208,13 @@ pub struct Walk<T: SampleType, S: Opt> {
     pub walk_dir: Vec<bool>,
     pub walk_id: Vec<T>,
     pub opt: S,
+}
+
+impl<T: SampleType, S: Opt> Drop for Walk<T, S> {
+    fn drop(&mut self) {
+        println!("Dropping LargeData2 with data_string: {}", self.sample_id);
+        // You can add more debug prints or cleanup logic here
+    }
 }
 
 /// GFA Containment
@@ -187,6 +251,9 @@ pub struct Gfa<T: SampleType + Ord, S: Opt + Ord, U: Opt> {
     pub containment: Vec<Containment<T, S>>,
     pub walk: Vec<Walk<T, S>>,
 
+    pub is_digit: bool,
+    index_of_index: Vec<usize>,
+    index_low: usize,
     pub sequence: String,
 }
 
@@ -207,6 +274,10 @@ impl<T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U> {
             jump: Vec::new(),
             containment: Vec::new(),
             walk: Vec::new(),
+            is_digit: false,
+
+            index_of_index: Vec::new(),
+            index_low: 0,
         }
     }
 
@@ -227,7 +298,7 @@ impl<T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U> {
                 match split_line.next().unwrap() {
                     "S" => {
                         let name = split_line.next().unwrap();
-                        if version_number < 2.0 {
+                        if version_number <= 2.0 {
                             let sequence = split_line.next().unwrap();
                             let size = sequence.len() as u32;
                             let opt = split_line.next();
@@ -271,25 +342,36 @@ impl<T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U> {
                         });
                     }
                     "P" => {
-                        let name = split_line.next().unwrap().to_string();
-                        let (dirs, node_id) = path_parser(split_line.next().unwrap(), &mut z.sequence);
-                        let overlap = split_line.next();
+                        let name = split_line.next().unwrap().to_owned();
+                        //let (dirs, node_id) = path_parser(split_line.next().unwrap(), &mut z.sequence);
+                        let a = split_line.next().unwrap().split(',');
+                        let (mut dirs, mut node_id) = (
+                            Vec::with_capacity(a.clone().count()),
+                            Vec::with_capacity(a.clone().count()),
+                        );
+                        for d in a {
+                            dirs.push(&d[d.len() - 1..] == "+");
+                            node_id.push(SampleType::parse1(&d[..d.len() - 1], &mut z.sequence));
+                        }
+
+                        let k = U::parse1(split_line.next(), &mut z.sequence);
+                        let k2 = S::parse1(split_line.next(), &mut z.sequence);
                         z.paths.push(Path {
                             name,
                             dir: dirs,
                             nodes: node_id,
-                            overlap: U::parse1(overlap, &mut z.sequence),
-                            opt: S::parse1(split_line.next(), &mut z.sequence),
+                            overlap: k,
+                            opt: k2,
                         });
                     }
                     "W" => {
-                        let sample_id = split_line.next().unwrap().to_string();
+                        let sample_id = split_line.next().unwrap().to_owned();
                         let hap_index = split_line.next().unwrap().parse().unwrap();
-                        let seq_id = split_line.next().unwrap().to_string();
+                        let seq_id = split_line.next().unwrap().to_owned();
                         let seq_start = split_line.next().unwrap().parse().unwrap();
                         let seq_end = split_line.next().unwrap().parse().unwrap();
                         let (w1, w2) = walk_parser(split_line.next().unwrap(), &mut z.sequence);
-                        let opt = split_line.next();
+                        let opt = S::parse1(split_line.next(), &mut z.sequence);
                         z.walk.push(Walk {
                             sample_id,
                             hap_index,
@@ -298,7 +380,7 @@ impl<T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U> {
                             seq_end,
                             walk_dir: w1,
                             walk_id: w2,
-                            opt: S::parse1(opt, &mut z.sequence),
+                            opt: opt,
                         });
                     }
                     "C" => {
@@ -339,6 +421,9 @@ impl<T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U> {
                 }
             }
             z.segments.sort_by(|a, b| a.id.cmp(&b.id));
+            z.is_digit = T::is_digit();
+            z.index_of_index = z.segments.iter().enumerate().map(|x| x.0).collect();
+            z.index_low = z.segments[0].id.get_usize();
             z
         } else {
             Gfa::new()
@@ -347,21 +432,27 @@ impl<T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U> {
 
     /// Convert Walk to Path
     pub fn walk_to_path(&mut self, sep: &str) {
+
         for walk in self.walk.iter() {
+            let f = walk.walk_id.iter().map(|x| x.clone()).collect();
+            let o = U::parse1(None, &mut self.sequence);
+            let n = walk.sample_id.to_owned()
+                + sep
+                + &walk.hap_index.to_owned().to_string()
+                + sep
+                + &walk.seq_id
+                + ":"
+                + &walk.seq_start.to_owned().to_string()
+                + "-"
+                + &walk.seq_end.to_owned().to_string();
+            let w = walk.walk_dir.iter().map(|x| *x).collect();
+            let opt =  walk.opt.clone();
             self.paths.push(Path {
-                name: walk.sample_id.clone()
-                    + sep
-                    + &walk.hap_index.to_string()
-                    + sep
-                    + &walk.seq_id.clone()
-                    + ":"
-                    + &walk.seq_start.to_string()
-                    + "-"
-                    + &walk.seq_end.to_string(),
-                dir: walk.walk_dir.clone(),
-                nodes: walk.walk_id.to_vec(),
-                overlap: U::parse1(None, &mut self.sequence),
-                opt: walk.opt.clone(),
+                name: n,
+                dir: w,
+                nodes: f,
+                overlap: o,
+                opt: opt,
             });
         }
         self.walk = Vec::new();
@@ -376,12 +467,36 @@ impl<T: SampleType + Ord + Clone, S: Opt + Ord + Clone, U: Opt> Gfa<T, S, U> {
                 == T::parse1(&self.segments.len().to_string(), &mut String::new())
     }
 
+    // pub fn make_compact(&mut self) {
+    //     let mut mmax = &self.segments[self.segments.len() - 1].id;
+    //     let mut last = &self.segments[0].id;
+    //     for x in self.segments.iter() {
+    //         if last as usize != &x.id as usize - 1  {
+    //             self.segments.push(Segment {
+    //                 id: last + 1,
+    //                 sequence: SeqIndex([0, 0]),
+    //                 length: 0,
+    //                 opt: T::parse1("0", &mut String::new()),
+    //             });
+    //         }
+    //     }
+    // }
+
     /// Get node by id
-    ///
-    /// Using binary search
     pub fn get_node_by_id(&self, id: &T) -> &Segment<T, S> {
-        &self.segments[self.segments.binary_search_by(|x| x.id.cmp(id)).unwrap()]
+        if self.is_digit{
+            &self.get_node_digit(&id.get_usize())
+        } else {
+            &self.segments[self.segments.binary_search_by(|x| x.id.cmp(id)).unwrap()]
+        }
     }
+
+    pub fn get_node_digit(&self, id: &usize) -> &Segment<T, S> {
+        let index = self.index_of_index[*id]-self.index_low;
+        &self.segments[index]
+    }
+
+
 }
 
 impl Gfa<u32, (), ()> {
@@ -447,6 +562,7 @@ pub fn check_numeric_compact_gfafile(file_name: &str) -> (bool, bool) {
     }
 }
 
+#[inline]
 /// Parse a path
 ///
 /// Separate node and direction with a comma
