@@ -598,13 +598,26 @@ impl<
         if self.is_digit {
             self.get_node_digit(&id.get_usize())
         } else {
-            &self.segments[self.segments.binary_search_by(|x| x.id.cmp(id)).unwrap()]
+            self.get_node_nondigit(&id)
         }
     }
 
     pub fn get_node_digit(&self, id: &usize) -> &Segment<T, S> {
         let index = self.index_of_index[*id] - self.index_low;
         &self.segments[index]
+    }
+    pub fn get_node_nondigit(&self, id: &T) -> &Segment<T, S> {
+        &self.segments[self.segments.binary_search_by(|x| x.id.cmp(id)).unwrap()]
+    }
+
+    pub fn get_sequence_by_id(&self, id: &T) -> &str {
+        self.get_node_by_id(id).sequence.get_string(&self.sequence)
+    }
+
+    pub fn get_sequence_by_digit(&self, id: &T) -> &str {
+        self.get_node_digit(&id.get_usize())
+            .sequence
+            .get_string(&self.sequence)
     }
 }
 
