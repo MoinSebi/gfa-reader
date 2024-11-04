@@ -379,7 +379,6 @@ impl<
 
         if T::is_digit(){
             let mut aa = vec![0; resulting_graph.segments[resulting_graph.segments.len()-1].id.get_usize() - resulting_graph.index_low +1];
-            println!("{:?}", aa.len());
             for (i, x) in resulting_graph.segments.iter().enumerate(){
                 aa[x.id.get_usize() - &resulting_graph.index_low] = i;
             }
@@ -536,7 +535,6 @@ impl<
 
             if T::is_digit(){
                 let mut aa = vec![0; resulting_graph.segments[resulting_graph.segments.len()-1].id.get_usize() - resulting_graph.index_low +1];
-                println!("{:?}", aa.len());
                 for (i, x) in resulting_graph.segments.iter().enumerate(){
                     aa[x.id.get_usize() - &resulting_graph.index_low] = i;
                 }
@@ -972,7 +970,6 @@ pub fn index_file(file_name: &str) -> Vec<usize> {
     if chunk_size != 0 {
         index.push(total_len);
     }
-    println!("{:?}", index);
 
     index
 }
