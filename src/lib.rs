@@ -375,13 +375,16 @@ impl<
         }
         resulting_graph.segments.sort_by(|a, b| a.id.cmp(&b.id));
         resulting_graph.is_digit = T::is_digit();
-        resulting_graph.index_of_index = resulting_graph
-            .segments
-            .iter()
-            .enumerate()
-            .map(|x| x.0)
-            .collect();
         resulting_graph.index_low = resulting_graph.segments[0].id.get_usize();
+
+        if T::is_digit(){
+            let mut aa = vec![0; resulting_graph.segments[resulting_graph.segments.len()-1].id.get_usize() - resulting_graph.index_low +1];
+            println!("{:?}", aa.len());
+            for (i, x) in resulting_graph.segments.iter().enumerate(){
+                aa[x.id.get_usize() - &resulting_graph.index_low] = i;
+            }
+            resulting_graph.index_of_index = aa;
+        }
         resulting_graph
     }
 
@@ -529,13 +532,16 @@ impl<
             }
             resulting_graph.segments.sort_by(|a, b| a.id.cmp(&b.id));
             resulting_graph.is_digit = T::is_digit();
-            resulting_graph.index_of_index = resulting_graph
-                .segments
-                .iter()
-                .enumerate()
-                .map(|x| x.0)
-                .collect();
             resulting_graph.index_low = resulting_graph.segments[0].id.get_usize();
+
+            if T::is_digit(){
+                let mut aa = vec![0; resulting_graph.segments[resulting_graph.segments.len()-1].id.get_usize() - resulting_graph.index_low +1];
+                println!("{:?}", aa.len());
+                for (i, x) in resulting_graph.segments.iter().enumerate(){
+                    aa[x.id.get_usize() - &resulting_graph.index_low] = i;
+                }
+                resulting_graph.index_of_index = aa;
+            }
             resulting_graph
         } else {
             Gfa::new()
@@ -603,7 +609,7 @@ impl<
     }
 
     pub fn get_node_digit(&self, id: &usize) -> &Segment<T, S> {
-        let index = self.index_of_index[*id] - self.index_low;
+        let index = self.index_of_index[*id - self.index_low];
         &self.segments[index]
     }
     pub fn get_node_nondigit(&self, id: &T) -> &Segment<T, S> {
@@ -618,6 +624,11 @@ impl<
         self.get_node_digit(&id.get_usize())
             .sequence
             .get_string(&self.sequence)
+    }
+
+
+    pub fn get_index_low(&self) -> usize {
+        self.index_low
     }
 }
 

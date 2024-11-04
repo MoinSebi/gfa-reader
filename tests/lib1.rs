@@ -26,6 +26,8 @@ fn read_gfa_string() {
     assert_eq!(gfa.get_node_by_id(&gfa.segments[0].id).length, 10);
 }
 
+
+
 #[test]
 /// Read GFA
 ///
@@ -65,11 +67,47 @@ fn read_gfa_string_vs_multi() {
 /// Read GFA
 ///
 /// + check header
+fn read_gfa_string_vs_multi_yeast() {
+    let mut gfa: Gfa<SeqIndex, (), ()> = Gfa::parse_gfa_file("data/size5.gfa");
+    let mut gfa2: Gfa<SeqIndex, (), ()> =
+        Gfa::parse_gfa_file_multi("data/size5.gfa", 2);
+
+    gfa.walk_to_path("#");
+    gfa2.walk_to_path("#");
+
+    assert_eq!(
+        gfa.segments[1].sequence.get_string(&gfa.sequence),
+        gfa2.segments[1].sequence.get_string(&gfa.sequence)
+    );
+
+    assert_eq!(gfa.segments.len(), gfa2.segments.len());
+
+    assert_eq!(gfa.links.len(), gfa2.links.len());
+
+    assert_eq!(
+        gfa.segments[0].sequence.get_string(&gfa.sequence),
+        gfa2.segments[0].sequence.get_string(&gfa.sequence)
+    );
+
+    assert_eq!(gfa.paths[0].dir, gfa2.paths[0].dir);
+
+    assert_eq!(gfa.walk.len(), gfa2.walk.len());
+    assert_eq!(
+        gfa.get_node_by_id(&gfa.segments[0].id).length,
+        gfa2.get_node_by_id(&gfa.segments[0].id).length
+    );
+}
+
+#[test]
+/// Read GFA
+///
+/// + check header
 fn read_gfa_get_sequence() {
     let mut gfa: Gfa<SeqIndex, (), ()> = Gfa::parse_gfa_file("data/testGraph_complex.gfa");
     gfa.walk_to_path("#");
     let _o = gfa.segments[0].sequence.get_string(&gfa.sequence);
     assert_eq!(_o, gfa.get_sequence_by_id(&gfa.segments[0].id));
+
     assert_eq!(gfa.walk.len(), 0);
     assert_eq!(gfa.get_node_by_id(&gfa.segments[0].id).length, 10);
 }
@@ -79,14 +117,15 @@ fn read_gfa_get_sequence() {
 ///
 /// + check header
 fn read_gfa_get_sequence_digit() {
-    let mut gfa: Gfa<u32, (), ()> = Gfa::parse_gfa_file("data/testGraph_complex.gfa");
+    let mut gfa: Gfa<u32, (), ()> = Gfa::parse_gfa_file("data/size5.gfa");
     gfa.walk_to_path("#");
     let _o = gfa.segments[0].sequence.get_string(&gfa.sequence);
     assert_eq!(_o, gfa.get_sequence_by_id(&gfa.segments[0].id));
     assert_eq!(_o, gfa.get_sequence_by_digit(&gfa.segments[0].id));
+    assert_eq!("T", gfa.get_sequence_by_digit(&gfa.segments[6].id));
 
     assert_eq!(gfa.walk.len(), 0);
-    assert_eq!(gfa.get_node_by_id(&gfa.segments[0].id).length, 10);
+    assert_eq!(gfa.segments.len(), 26234);
 }
 
 
