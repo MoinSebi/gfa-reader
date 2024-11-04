@@ -27,10 +27,34 @@ fn read_gfa_string() {
 }
 
 #[test]
+/// Read GFA
+///
+/// + check header
+fn read_gfa_string_vs_multi() {
+    let mut gfa: Gfa<SeqIndex, (), ()> = Gfa::parse_gfa_file("data/testGraph_complex.gfa");
+    let mut gfa2: Gfa<SeqIndex, (), ()> =
+        Gfa::parse_gfa_file_multi("data/testGraph_complex.gfa", 2);
+
+    gfa.walk_to_path("#");
+    gfa2.walk_to_path("#");
+
+    assert_eq!(
+        gfa.segments[0].sequence.get_string(&gfa.sequence),
+        gfa2.segments[0].sequence.get_string(&gfa.sequence)
+    );
+
+    assert_eq!(gfa.walk.len(), gfa2.walk.len());
+    assert_eq!(
+        gfa.get_node_by_id(&gfa.segments[0].id).length,
+        gfa2.get_node_by_id(&gfa.segments[0].id).length
+    );
+}
+
+#[test]
 /// READ GFA 1.1
 fn read_gfa_header2() {
     let mut gfa: Gfa<u64, (), ()> = Gfa::parse_gfa_file("data/testGraph_1.1.gfa");
-    assert_eq!(gfa.walk[gfa.walk.len()-1].walk_id.len(), 1);
+    assert_eq!(gfa.walk[gfa.walk.len() - 1].walk_id.len(), 1);
 
     gfa.walk_to_path("#");
     let o = gfa.get_node_by_id(&1).id;
@@ -38,7 +62,7 @@ fn read_gfa_header2() {
     assert_eq!(gfa.walk.len(), 0);
     assert_eq!(gfa.paths.len(), 7);
 
-    assert_eq!(gfa.paths[gfa.paths.len()-1].nodes.len(), 1);
+    assert_eq!(gfa.paths[gfa.paths.len() - 1].nodes.len(), 1);
     assert_eq!(o, 1);
 }
 
@@ -55,7 +79,6 @@ fn check_numeric() {
     assert!(gfa);
     let gfa = check_numeric_gfafile("data/testGraph_non-num.gfa");
     assert!(!gfa);
-
 }
 
 #[test]
