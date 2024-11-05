@@ -77,7 +77,12 @@ fn read_gfa_string_vs_multi_yeast() {
 
     assert_eq!(
         gfa.segments[1].sequence.get_string(&gfa.sequence),
-        gfa2.segments[1].sequence.get_string(&gfa.sequence)
+        gfa2.segments[1].sequence.get_string(&gfa2.sequence)
+    );
+
+    assert_eq!(
+        gfa.segments[gfa.segments.len()-1].sequence.get_string(&gfa.sequence),
+        gfa2.segments[gfa2.segments.len()-1].sequence.get_string(&gfa2.sequence)
     );
 
     assert_eq!(gfa.segments.len(), gfa2.segments.len());
@@ -86,7 +91,7 @@ fn read_gfa_string_vs_multi_yeast() {
 
     assert_eq!(
         gfa.segments[0].sequence.get_string(&gfa.sequence),
-        gfa2.segments[0].sequence.get_string(&gfa.sequence)
+        gfa2.segments[0].sequence.get_string(&gfa2.sequence)
     );
 
     assert_eq!(gfa.paths[0].dir, gfa2.paths[0].dir);
@@ -94,7 +99,7 @@ fn read_gfa_string_vs_multi_yeast() {
     assert_eq!(gfa.walk.len(), gfa2.walk.len());
     assert_eq!(
         gfa.get_node_by_id(&gfa.segments[0].id).length,
-        gfa2.get_node_by_id(&gfa.segments[0].id).length
+        gfa2.get_node_by_id(&gfa2.segments[0].id).length
     );
 }
 

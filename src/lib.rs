@@ -371,7 +371,7 @@ impl<
             if !resulting_graph.header.version_number.is_empty() {
                 resulting_graph.header.version_number = graph.header.version_number.clone();
             }
-            offset += graph.sequence.len() - 1
+            offset += graph.sequence.len()
         }
         resulting_graph.segments.sort_by(|a, b| a.id.cmp(&b.id));
         resulting_graph.is_digit = T::is_digit();
