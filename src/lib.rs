@@ -604,7 +604,7 @@ impl<
     /// Get a segment by id (both)
     pub fn get_segment_by_id(&self, id: &T) -> &Segment<T, S> {
         if self.is_digit {
-            self.get_segment_digit(&id)
+            self.get_segment_digit(id)
         } else {
             self.get_segment_nondigit(id)
         }
@@ -628,7 +628,6 @@ impl<
             .get_string(&self.sequence)
     }
 
-
     /// Get a sequence by id (nondigit)
     pub fn get_sequence_by_id_nondigit(&self, id: &T) -> &str {
         self.get_segment_nondigit(id)
@@ -638,7 +637,7 @@ impl<
 
     /// Get a sequence by id (digit)
     pub fn get_sequence_by_digit(&self, id: &T) -> &str {
-        self.get_segment_digit(&id)
+        self.get_segment_digit(id)
             .sequence
             .get_string(&self.sequence)
     }

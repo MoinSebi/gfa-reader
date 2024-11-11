@@ -20,7 +20,6 @@ fn id_digit(ff: &Vec<Segment<u64, ()>>, gfa: &Gfa<u64, (), ()>) {
     for x in ff.iter() {
         let _ = gfa.get_segment_digit(&x.id);
         let _b = gfa.get_sequence_by_digit(&x.id);
-
     }
 }
 
@@ -33,8 +32,9 @@ fn criterion_benchmark(c: &mut Criterion) {
     ff.shuffle(&mut rand::thread_rng());
     group.bench_function("Reader_bench", |b| b.iter(|| gfa_normal(filename)));
     group.bench_function("segment_digit", |b| b.iter(|| id_digit(&ff, &graph)));
-    group.bench_function("segment_nondigit ", |b| b.iter(|| id_non_digit(&ff, &graph)));
-
+    group.bench_function("segment_nondigit ", |b| {
+        b.iter(|| id_non_digit(&ff, &graph))
+    });
 }
 
 criterion_group!(benches, criterion_benchmark);
