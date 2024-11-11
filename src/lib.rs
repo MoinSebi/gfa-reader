@@ -265,7 +265,7 @@ pub struct Gfa<
     pub is_digit: bool,
     index_of_index: Vec<usize>,
     index_low: usize,
-    pub sequence: String,
+    sequence: String,
 }
 
 impl<
@@ -306,6 +306,10 @@ impl<
         }
     }
 
+    /// Parse a gfa file with multiple threads
+    ///
+    /// The function will split the file into chunks and parse them in parallel
+    /// Pre-index in chunks of 40 mb, multiple such chunks will be processed by one thread (number dependent on the number of threads)
     pub fn parse_gfa_file_multi(file_name: &str, threads: usize) -> Gfa<T, S, U> {
         let index = index_file(file_name);
         let version = get_version(file_name);
@@ -369,7 +373,7 @@ impl<
 
             resulting_graph.sequence += graph.sequence.as_str();
             if !resulting_graph.header.version_number.is_empty() {
-                resulting_graph.header.version_number = graph.header.version_number.clone();
+                resulting_graph.header = graph.header.clone();
             }
             offset += graph.sequence.len()
         }
@@ -377,17 +381,25 @@ impl<
         resulting_graph.is_digit = T::is_digit();
         resulting_graph.index_low = resulting_graph.segments[0].id.get_usize();
 
-        if T::is_digit(){
-            let mut aa = vec![0; resulting_graph.segments[resulting_graph.segments.len()-1].id.get_usize() - resulting_graph.index_low +1];
-            for (i, x) in resulting_graph.segments.iter().enumerate(){
-                aa[x.id.get_usize() - &resulting_graph.index_low] = i;
+        if T::is_digit() {
+            let mut index2index = vec![
+                0;
+                resulting_graph.segments[resulting_graph.segments.len() - 1]
+                    .id
+                    .get_usize()
+                    - resulting_graph.index_low
+                    + 1
+            ];
+            for (i, x) in resulting_graph.segments.iter().enumerate() {
+                index2index[x.id.get_usize() - resulting_graph.index_low] = i;
             }
-            resulting_graph.index_of_index = aa;
+            resulting_graph.index_of_index = index2index;
         }
         resulting_graph
     }
 
     #[inline]
+    /// Read lines from a GFA file
     pub fn read_lines(s: String, version_number: f32, z: &mut Gfa<T, S, U>) {
         let mut split_line = s.split_whitespace();
         match split_line.next().unwrap() {
@@ -533,10 +545,17 @@ impl<
             resulting_graph.is_digit = T::is_digit();
             resulting_graph.index_low = resulting_graph.segments[0].id.get_usize();
 
-            if T::is_digit(){
-                let mut aa = vec![0; resulting_graph.segments[resulting_graph.segments.len()-1].id.get_usize() - resulting_graph.index_low +1];
-                for (i, x) in resulting_graph.segments.iter().enumerate(){
-                    aa[x.id.get_usize() - &resulting_graph.index_low] = i;
+            if T::is_digit() {
+                let mut aa = vec![
+                    0;
+                    resulting_graph.segments[resulting_graph.segments.len() - 1]
+                        .id
+                        .get_usize()
+                        - resulting_graph.index_low
+                        + 1
+                ];
+                for (i, x) in resulting_graph.segments.iter().enumerate() {
+                    aa[x.id.get_usize() - resulting_graph.index_low] = i;
                 }
                 resulting_graph.index_of_index = aa;
             }
@@ -582,51 +601,62 @@ impl<
                 == T::parse1(&self.segments.len().to_string(), &mut String::new())
     }
 
-    // pub fn make_compact(&mut self) {
-    //     let mut mmax = &self.segments[self.segments.len() - 1].id;
-    //     let mut last = &self.segments[0].id;
-    //     for x in self.segments.iter() {
-    //         if last as usize != &x.id as usize - 1  {
-    //             self.segments.push(Segment {
-    //                 id: last + 1,
-    //                 sequence: SeqIndex([0, 0]),
-    //                 length: 0,
-    //                 opt: T::parse1("0", &mut String::new()),
-    //             });
-    //         }
-    //     }
-    // }
-
-    /// Get node by id
-    pub fn get_node_by_id(&self, id: &T) -> &Segment<T, S> {
+    /// Get a segment by id (both)
+    pub fn get_segment_by_id(&self, id: &T) -> &Segment<T, S> {
         if self.is_digit {
-            self.get_node_digit(&id.get_usize())
+            self.get_segment_digit(&id)
         } else {
-            self.get_node_nondigit(&id)
+            self.get_segment_nondigit(id)
         }
     }
 
-    pub fn get_node_digit(&self, id: &usize) -> &Segment<T, S> {
-        let index = self.index_of_index[*id - self.index_low];
+    /// Get a segment by id (digit)
+    pub fn get_segment_digit(&self, id: &T) -> &Segment<T, S> {
+        let index = self.index_of_index[id.get_usize() - self.index_low];
         &self.segments[index]
     }
-    pub fn get_node_nondigit(&self, id: &T) -> &Segment<T, S> {
+
+    /// Get a segment by id (nondigit)
+    pub fn get_segment_nondigit(&self, id: &T) -> &Segment<T, S> {
         &self.segments[self.segments.binary_search_by(|x| x.id.cmp(id)).unwrap()]
     }
 
+    /// Get a sequence by id
     pub fn get_sequence_by_id(&self, id: &T) -> &str {
-        self.get_node_by_id(id).sequence.get_string(&self.sequence)
-    }
-
-    pub fn get_sequence_by_digit(&self, id: &T) -> &str {
-        self.get_node_digit(&id.get_usize())
+        self.get_segment_by_id(id)
             .sequence
             .get_string(&self.sequence)
     }
 
 
+    /// Get a sequence by id (nondigit)
+    pub fn get_sequence_by_id_nondigit(&self, id: &T) -> &str {
+        self.get_segment_nondigit(id)
+            .sequence
+            .get_string(&self.sequence)
+    }
+
+    /// Get a sequence by id (digit)
+    pub fn get_sequence_by_digit(&self, id: &T) -> &str {
+        self.get_segment_digit(&id)
+            .sequence
+            .get_string(&self.sequence)
+    }
+
     pub fn get_index_low(&self) -> usize {
         self.index_low
+    }
+
+    pub fn get_index_high(&self) -> usize {
+        self.segments[self.segments.len() - 1].id.get_usize()
+    }
+
+    pub fn get_index_of_index(&self) -> &Vec<usize> {
+        &self.index_of_index
+    }
+
+    pub fn get_sequence(&self) -> &str {
+        &self.sequence
     }
 }
 
@@ -711,6 +741,7 @@ fn path_parser<T: SampleType>(path: &str, s: &mut String) -> (Vec<bool>, Vec<T>)
     (dirs, node_id)
 }
 
+#[inline]
 /// Parse a walk
 fn walk_parser<T: SampleType>(walk: &str, s1: &mut String) -> (Vec<bool>, Vec<T>) {
     let a = walk[1..].split(['<', '>']).count();
@@ -731,37 +762,6 @@ fn walk_parser<T: SampleType>(walk: &str, s1: &mut String) -> (Vec<bool>, Vec<T>
     (dirs, node_id)
 }
 
-pub fn fill_nodes(graph: &mut Gfa<u32, (), ()>) {
-    graph.segments.sort();
-
-    let mut filled_vec = Vec::new();
-    let mut prev_value = graph.segments[0].id;
-
-    // Iterate through the sorted vector and find missing values
-    for value in graph.segments.iter() {
-        // Check if there are missing values between previous value and current value
-        if value.id > prev_value + 1 {
-            // Insert missing values
-            for missing_value in prev_value + 1..value.id {
-                filled_vec.push(Segment {
-                    id: missing_value,
-                    sequence: SeqIndex([0, 0]),
-                    length: 0,
-                    opt: (),
-                });
-            }
-        }
-        filled_vec.push(Segment {
-            id: value.id,
-            sequence: value.sequence.clone(),
-            length: value.length,
-            opt: (),
-        });
-        prev_value = value.id;
-    }
-    graph.segments = filled_vec;
-}
-
 /// Parse a string to a generic type
 ///
 /// Only needed for Jumps
@@ -774,11 +774,12 @@ fn parse_dumb(s: &str) -> i64 {
 }
 
 #[derive(Debug, Clone)]
-/// PanSN-spec path data structure
-/// PanSN-spec
-/// [sample_name][delim][haplotype_id][delim][contig_or_scaffold_name]
-pub struct Pansn<'a, T: SampleType, S: Opt, U: Opt> {
-    pub genomes: Vec<Sample<'a, T, S, U>>,
+/// PanSN-spec haplotype
+///
+/// Merging multiple paths together
+pub struct Haplotype<'a, T: SampleType, S: Opt, U: Opt> {
+    pub name: String,
+    pub paths: Vec<&'a Path<T, S, U>>,
 }
 
 #[derive(Debug, Clone)]
@@ -787,14 +788,26 @@ pub struct Sample<'a, T: SampleType, S: Opt, U: Opt> {
     pub haplotypes: Vec<Haplotype<'a, T, S, U>>,
 }
 
-#[derive(Debug, Clone)]
-/// PanSN-spec haplotype
-///
-/// Merging multiple paths together
-pub struct Haplotype<'a, T: SampleType, S: Opt, U: Opt> {
-    pub name: String,
-    pub paths: Vec<&'a Path<T, S, U>>,
+impl<'a, T: SampleType, S: Opt, U: Opt> Sample<'a, T, S, U> {
+    pub fn get_haplo_path(&self) -> Vec<&&Path<T, S, U>> {
+        let mut result = Vec::new();
+        for x in self.haplotypes.iter() {
+            for y in x.paths.iter() {
+                result.push(y);
+            }
+        }
+        result
+    }
 }
+
+#[derive(Debug, Clone)]
+/// PanSN-spec path data structure
+/// PanSN-spec
+/// [sample_name][delim][haplotype_id][delim][contig_or_scaffold_name]
+pub struct Pansn<'a, T: SampleType, S: Opt, U: Opt> {
+    pub genomes: Vec<Sample<'a, T, S, U>>,
+}
+
 impl<'a, T: SampleType, S: Opt, U: Opt> Default for Pansn<'a, T, S, U> {
     fn default() -> Self {
         Self::new()
@@ -896,10 +909,10 @@ impl<'a, T: SampleType, S: Opt, U: Opt> Pansn<'a, T, S, U> {
     /// Get path for each haplotype
     pub fn get_haplo_path(&self) -> Vec<(String, Vec<&Path<T, S, U>>)> {
         let mut result = Vec::new();
-        for x in self.genomes.iter() {
-            for y in x.haplotypes.iter() {
-                let kk: Vec<_> = y.paths.to_vec();
-                result.push((x.name.clone() + "#" + &y.name, kk));
+        for sample in self.genomes.iter() {
+            for haplo in sample.haplotypes.iter() {
+                let haplo_path: Vec<_> = haplo.paths.to_vec();
+                result.push((sample.name.clone() + "#" + &haplo.name, haplo_path));
             }
         }
 
@@ -974,6 +987,9 @@ pub fn index_file(file_name: &str) -> Vec<usize> {
     index
 }
 
+/// Create pairs from a vector
+///
+/// pair -> (Value, next value)
 fn pair_with_next<T: Copy>(vec: &[T]) -> Vec<(T, T)> {
     vec.iter()
         .zip(vec.iter().skip(1))
